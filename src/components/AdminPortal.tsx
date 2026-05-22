@@ -124,11 +124,23 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
   const [newPujaMantraMeaning, setNewPujaMantraMeaning] = useState('Salutations to the remover of absolute obstacles, Ganesha.');
 
   // Global settings local states synced with prop settings
-  const [localPhone, setLocalPhone] = useState(settings.contactPhone);
-  const [localWhatsapp, setLocalWhatsapp] = useState(settings.whatsappNumber);
-  const [localApiKey, setLocalApiKey] = useState(settings.geminiApiKey);
-  const [localUpiId, setLocalUpiId] = useState(settings.upiId);
-  const [localUpiQr, setLocalUpiQr] = useState(settings.upiQrUrl);
+  const [localPhone, setLocalPhone] = useState(settings.contactPhone || '+91 98851 10082');
+  const [localWhatsapp, setLocalWhatsapp] = useState(settings.whatsappNumber || '+91 98851 10082');
+  const [localApiKey, setLocalApiKey] = useState(settings.geminiApiKey || '');
+  const [localUpiId, setLocalUpiId] = useState(settings.upiId || 'shastri.pandit108@okhdfcbank');
+  const [localUpiQr, setLocalUpiQr] = useState(settings.upiQrUrl || '');
+  
+  const [localPanditName, setLocalPanditName] = useState(settings.panditName || 'Shyam Guru ji');
+  const [localPanditCertification, setLocalPanditCertification] = useState(settings.panditCertification || 'certified by Mathura');
+  const [localPanditBio, setLocalPanditBio] = useState(settings.panditBio || 'Eminent Vedic Shastri certified by Mathura.');
+  const [localPanditImage, setLocalPanditImage] = useState(settings.panditImage || '👳🏽');
+  const [localDevoteeTerms, setLocalDevoteeTerms] = useState(settings.devoteeTerms || '');
+  
+  const [localShowExplorePujasTab, setLocalShowExplorePujasTab] = useState(settings.showExplorePujasTab !== false);
+  const [localShowAiPanditTab, setLocalShowAiPanditTab] = useState(settings.showAiPanditTab !== false);
+  const [localShowMyBookingsTab, setLocalShowMyBookingsTab] = useState(settings.showMyBookingsTab !== false);
+  const [localShowAdminPortalTab, setLocalShowAdminPortalTab] = useState(settings.showAdminPortalTab !== false);
+
   const [settingsSuccessMsg, setSettingsSuccessMsg] = useState('');
 
   // Curated premium high-quality secure temple image presets for easy Deity photo-changing
@@ -223,20 +235,32 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
       {
         id: 'basic',
         name: 'E-Puja Remote Path',
-        desc: 'Participate remotely via interactive high-definition livestream. Dynamic chant coordination & offline Prasad dispatch.',
-        price: newPujaBasePrice
+        description: 'Participate remotely via interactive high-definition livestream. Dynamic chant coordination & offline Prasad dispatch.',
+        price: newPujaBasePrice,
+        benefits: ["Live interactive HD streams", "Sankalpa recitation", "Prasad dispatch by speed post"],
+        durationMinutes: 60,
+        includedSamagri: false,
+        dakshinaInclusions: ["Senior Shastri Ji's recitation fees", "Digital holy certificate"]
       },
       {
         id: 'standard',
         name: 'In-person Ghar Puja Sanskar',
-        desc: 'Sacred Pandit Shastris visiting your home. Traditional sandhya decorations, custom dynamic sankalpa mantra recitation.',
-        price: newPujaBasePrice * 2
+        description: 'Sacred Pandit Shastris visiting your home. Traditional sandhya decorations, custom dynamic sankalpa mantra recitation.',
+        price: newPujaBasePrice * 2,
+        benefits: ["Scholastic Priest visits home", "Complete offline Havan setup", "Astrological family horoscopy check"],
+        durationMinutes: 120,
+        includedSamagri: true,
+        dakshinaInclusions: ["Guru Dakshina", "Priest travel and accommodations", "Sacred thread binding"]
       },
       {
         id: 'premium',
         name: 'Maha Yajna Grand Puja & Havan',
-        desc: 'Multi-priest sacred Homam. Sourcing 100% pure cow ghee, sacred samagri woods, complete herbal havan setup.',
-        price: newPujaBasePrice * 4
+        description: 'Multi-priest sacred Homam. Sourcing 100% pure cow ghee, sacred samagri woods, complete herbal havan setup.',
+        price: newPujaBasePrice * 4,
+        benefits: ["Three high-caliber Acharyas", "Grand multi-priest chanting", "Complete high-grade samagri kit included"],
+        durationMinutes: 180,
+        includedSamagri: true,
+        dakshinaInclusions: ["Multi-priest combined guru dakshina", "Ritual materials and home arrangements", "Special celestial chanting protection"]
       }
     ];
 
@@ -256,9 +280,9 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
       imageUrl: newPujaImage,
       packages: createdPackages,
       samagriList: [
-        { name: 'Pure Desi Cow Ghee', quantity: '500g', status: 'provided' },
-        { name: 'Sacred Havan Samagri Wood', quantity: '1 Pack', status: 'provided' },
-        { name: 'Kesar & Kapoor Pouch', quantity: '1 Set', status: 'provided' }
+        { name: 'Pure Desi Cow Ghee', quantity: '500g', isMandatory: true, category: 'essential' },
+        { name: 'Sacred Havan Samagri Wood', quantity: '1 Pack', isMandatory: true, category: 'sacred' },
+        { name: 'Kesar & Kapoor Pouch', quantity: '1 Set', isMandatory: true, category: 'sacred' }
       ],
       mantra: newPujaMantra || 'ॐ श्री गणेशाय नमः',
       mantraMeaning: newPujaMantraMeaning || 'Salutations to the Remover of All Obstacles.'
@@ -305,12 +329,21 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
       whatsappNumber: localWhatsapp || '+91 98851 10082',
       geminiApiKey: localApiKey || '',
       upiId: localUpiId || 'shastri.pandit108@okhdfcbank',
-      upiQrUrl: localUpiQr || ''
+      upiQrUrl: localUpiQr || '',
+      panditName: localPanditName,
+      panditCertification: localPanditCertification,
+      panditBio: localPanditBio,
+      panditImage: localPanditImage,
+      devoteeTerms: localDevoteeTerms,
+      showExplorePujasTab: localShowExplorePujasTab,
+      showAiPanditTab: localShowAiPanditTab,
+      showMyBookingsTab: localShowMyBookingsTab,
+      showAdminPortalTab: localShowAdminPortalTab
     };
     setSettings(updatedSettings);
     // Write back to localstorage immediately
     localStorage.setItem('pooja4panditji_portal_settings', JSON.stringify(updatedSettings));
-    setSettingsSuccessMsg('ॐ Shanti! Global support helpline, WhatsApp details, and QR payment routes updated successfully.');
+    setSettingsSuccessMsg('ॐ Shanti! Global support helpline, WhatsApp details, Pandit certified profile, and tab configurations updated successfully.');
     setTimeout(() => setSettingsSuccessMsg(''), 5000);
   };
 
@@ -1345,6 +1378,154 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                   />
                   <p className="text-[10px] text-gray-400 font-sans">Leave blank to let us generate dynamic scan codes automatically on user checkouts.</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Dynamic Pandit Certified Profile Editor */}
+            <div className="bg-saffron-50/15 border border-saffron-100/60 p-4 rounded-xl space-y-4">
+              <h5 className="font-bold text-saffron-900 uppercase tracking-wider text-[10px] flex items-center gap-2 border-b border-saffron-100 pb-2">
+                <Users className="w-4 h-4 text-orange-600" />
+                <span>Pandit Certified Profile Details</span>
+              </h5>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-semibold text-gray-655 font-sans">Guru Pandit Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={localPanditName}
+                    onChange={(e) => setLocalPanditName(e.target.value)}
+                    placeholder="eg. Shyam Guru ji"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 font-semibold text-gray-850"
+                  />
+                  <p className="text-[10px] text-gray-450 leading-relaxed font-sans">Used consistently as Pandit's official name across all interfaces.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-semibold text-gray-655 font-sans">Certification / Title Line</label>
+                  <input
+                    type="text"
+                    required
+                    value={localPanditCertification}
+                    onChange={(e) => setLocalPanditCertification(e.target.value)}
+                    placeholder="eg. certified by Mathura"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 font-semibold text-gray-850"
+                  />
+                  <p className="text-[10px] text-gray-455 leading-relaxed font-sans">Credential proof (e.g. Certified by Mathura, Gold medalist at Mathura).</p>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-semibold text-gray-655 font-sans">Pandit Bio & Spiritual Journey</label>
+                <textarea
+                  rows={3}
+                  value={localPanditBio}
+                  onChange={(e) => setLocalPanditBio(e.target.value)}
+                  placeholder="Tell devotees about your spiritual experiences, family line, or temple background..."
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 text-gray-700 leading-normal font-sans text-xs"
+                />
+                <p className="text-[10px] text-gray-450 leading-relaxed font-sans">Included organically within Gemini's consciousness parameters to direct personalized AI chat flow.</p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-semibold text-gray-655 font-sans">Pandit Profile Image Avatar (Emoji or URL)</label>
+                <input
+                  type="text"
+                  value={localPanditImage}
+                  onChange={(e) => setLocalPanditImage(e.target.value)}
+                  placeholder="👳🏽"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 text-gray-850 font-mono text-xs"
+                />
+                <p className="text-[10px] text-gray-450 leading-relaxed font-sans">Defaults to traditional Pandit emoji (👳🏽) or provide a hosted URL link.</p>
+              </div>
+            </div>
+
+            {/* Devotee Terms & Conditions Configurator */}
+            <div className="bg-saffron-50/15 border border-saffron-100/60 p-4 rounded-xl space-y-4">
+              <h5 className="font-bold text-saffron-900 uppercase tracking-wider text-[10px] flex items-center gap-2 border-b border-saffron-100 pb-2">
+                <FileText className="w-4 h-4 text-amber-600" />
+                <span>Devotee Terms and Conditions Configurator</span>
+              </h5>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-semibold text-gray-655 font-sans">Active Terms of Use Contract</label>
+                <textarea
+                  rows={4}
+                  value={localDevoteeTerms}
+                  onChange={(e) => setLocalDevoteeTerms(e.target.value)}
+                  placeholder="Define dynamic devotee terms, materials dispatch responsibilities..."
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 font-sans leading-normal text-xs text-gray-750"
+                />
+                <p className="text-[10px] text-gray-450 leading-relaxed font-sans">
+                  Define user guidelines, E-puja coordinates rules, or Sanskrit chanting alignment responsibilities. Displayed dynamically in user click modal.
+                </p>
+              </div>
+            </div>
+
+            {/* Tab Visibility Active Options Controller */}
+            <div className="bg-saffron-50/15 border border-saffron-100/60 p-4 rounded-xl space-y-4">
+              <h5 className="font-bold text-saffron-900 uppercase tracking-wider text-[10px] flex items-center gap-2 border-b border-saffron-100 pb-2">
+                <Eye className="w-4 h-4 text-blue-600" />
+                <span>Portal Navigation Tab Visibility Controller</span>
+              </h5>
+
+              <p className="text-[10.5px] text-gray-450 leading-relaxed font-sans mb-1">
+                Configure active screens layout dynamically. Uncheck any tabs to hide them instantly from general devotee navigation menus.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <label className="flex items-center gap-2.5 bg-white p-2.5 rounded-lg border border-gray-150 cursor-pointer hover:bg-gray-50/50">
+                  <input
+                    type="checkbox"
+                    checked={localShowExplorePujasTab}
+                    onChange={(e) => setLocalShowExplorePujasTab(e.target.checked)}
+                    className="rounded text-saffron-600 focus:ring-saffron-500 h-4 w-4 shrink-0"
+                  />
+                  <div>
+                    <span className="font-bold text-gray-800 text-[11px] block">🌸 Explore Pujas Tab</span>
+                    <span className="text-[9px] text-gray-450">Catalogs listings for active devotee bookings</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2.5 bg-white p-2.5 rounded-lg border border-gray-150 cursor-pointer hover:bg-gray-50/50">
+                  <input
+                    type="checkbox"
+                    checked={localShowAiPanditTab}
+                    onChange={(e) => setLocalShowAiPanditTab(e.target.checked)}
+                    className="rounded text-saffron-600 focus:ring-saffron-500 h-4 w-4 shrink-0"
+                  />
+                  <div>
+                    <span className="font-bold text-gray-800 text-[11px] block">👳🏽 AI Pandit Ji Chat Tab</span>
+                    <span className="text-[9px] text-gray-450">Interactive multilingual Vedic query solver</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2.5 bg-white p-2.5 rounded-lg border border-gray-150 cursor-pointer hover:bg-gray-50/50">
+                  <input
+                    type="checkbox"
+                    checked={localShowMyBookingsTab}
+                    onChange={(e) => setLocalShowMyBookingsTab(e.target.checked)}
+                    className="rounded text-saffron-600 focus:ring-saffron-500 h-4 w-4 shrink-0"
+                  />
+                  <div>
+                    <span className="font-bold text-gray-800 text-[11px] block">📅 My Bookings Tab</span>
+                    <span className="text-[9px] text-gray-450">Tracks active reservations and digital certificates</span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-2.5 bg-white p-2.5 rounded-lg border border-gray-150 cursor-pointer hover:bg-gray-50/50">
+                  <input
+                    type="checkbox"
+                    checked={localShowAdminPortalTab}
+                    onChange={(e) => setLocalShowAdminPortalTab(e.target.checked)}
+                    className="rounded text-saffron-600 focus:ring-saffron-500 h-4 w-4 shrink-0"
+                  />
+                  <div>
+                    <span className="font-bold text-gray-800 text-[11px] block">🛡️ Admin Portal Tab</span>
+                    <span className="text-[9px] text-gray-450">Restricts custom pricing and ledger reports</span>
+                  </div>
+                </label>
               </div>
             </div>
 
