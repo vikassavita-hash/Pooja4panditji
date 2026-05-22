@@ -1,0 +1,49 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sgoe-ui, sans-serif;
+  --font-display: "Cinzel", Georgia, serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Custom spiritual color palette for Saffron and Gold */
+  --color-saffron-50: #fdf5ea;
+  --color-saffron-100: #fbeacf;
+  --color-saffron-500: #df580a;
+  --color-saffron-600: #c24300;
+  --color-saffron-700: #9e3000;
+  --color-saffron-800: #7d2000;
+  
+  --color-gold-50: #fdf9e2;
+  --color-gold-100: #faf1b5;
+  --color-gold-500: #ca9f1d;
+  --color-gold-600: #ab8212;
+  --color-gold-700: #8a6409;
+}
+
+/* Base custom styles to integrate Display headings and scroll behavior */
+html, body {
+  scroll-behavior: smooth;
+  font-family: var(--font-sans);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Custom breathing animation for spiritual glow effects */
+@keyframes holy-glow {
+  0% {
+    box-shadow: 0 0 10px rgba(223, 88, 10, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(202, 159, 29, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 10px rgba(223, 88, 10, 0.2);
+  }
+}
+
+.holy-glow-effect {
+  animation: holy-glow 4s infinite ease-in-out;
+}

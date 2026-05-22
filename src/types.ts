@@ -1,0 +1,92 @@
+export interface SamagriItem {
+  name: string;
+  quantity: string;
+  isMandatory: boolean;
+  category: 'essential' | 'offering' | 'sacred' | 'fresh';
+}
+
+export interface PujaPackage {
+  id: 'basic' | 'standard' | 'premium';
+  name: string;
+  price: number;
+  description: string;
+  benefits: string[];
+  durationMinutes: number;
+  includedSamagri: boolean; // whether materials are included in this package
+  dakshinaInclusions: string[];
+}
+
+export interface Puja {
+  id: string;
+  name: string;
+  sanskritName: string;
+  tagline: string;
+  description: string;
+  significance: string;
+  category: 'prosperity' | 'remedial' | 'milestones' | 'festivals' | 'peace';
+   deity: string;
+  rating: number;
+  reviewCount: number;
+  durationString: string;
+  basePrice: number;
+  imageUrl: string;
+  packages: PujaPackage[];
+  samagriList: SamagriItem[];
+  mantra: string;
+  mantraMeaning: string;
+}
+
+export interface Booking {
+  id: string;
+  pujaId: string;
+  pujaName: string;
+  pujaImage: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  gothra?: string;
+  nakshatra?: string;
+  sankalpNames?: string;
+  mode: 'in-person-home' | 'in-person-temple' | 'e-puja';
+  dateTime: string;
+  language: string;
+  packageId: 'basic' | 'standard' | 'premium';
+  packageName: string;
+  price: number;
+  address?: string; // for home puja
+  includeSamagriKit: boolean;
+  notes?: string;
+  status: 'pending-payment' | 'confirmed' | 'completed' | 'cancelled';
+  paymentId?: string;
+  paymentMethod?: string;
+  meetingLink?: string; // for E-Puja
+  transactionDateTime?: string;
+  otpVerified?: boolean;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'pandit';
+  text: string;
+  timestamp: string;
+}
+
+export interface PortalSettings {
+  contactPhone: string;
+  whatsappNumber: string;
+  geminiApiKey: string;
+  upiId: string;
+  upiQrUrl: string; 
+}
+
+export interface UserAccount {
+  userId: string; // unique username or email
+  passwordHash: string; // simulated hash/password
+  fullName: string;
+  phone: string;
+  email: string;
+  gothra?: string;
+  nakshatra?: string;
+  createdAt: string;
+}
+
