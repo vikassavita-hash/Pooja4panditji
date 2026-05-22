@@ -493,7 +493,7 @@ export default function App() {
           // Close active booking modal if shifting focus
           setSelectedPuja(null);
         }} 
-        bookingCount={bookings.length} 
+        bookingCount={currentUser ? bookings.filter(b => b.customerEmail.toLowerCase() === currentUser.email.toLowerCase()).length : 0} 
         contactPhone={settings.contactPhone}
         whatsappNumber={settings.whatsappNumber}
         currentUser={currentUser}
@@ -800,169 +800,200 @@ export default function App() {
         {/* TAB 3: CUSTOMER MY BOOKINGS DASHBOARD */}
         {activeTab === 'bookings' && (
           <div className="space-y-6 animate-fadeIn" id="bookings-dashboard-view">
-            
-            {/* Header summary */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <div>
-                <h3 className="text-2xl font-extrabold text-saffron-800 font-display">Devotee Booking Records</h3>
-                <p className="text-xs text-gray-500">Secure digital dashboard tracking active Yajnas & Priest schedules</p>
-              </div>
-              <div className="flex items-center gap-2 text-xs bg-saffron-100/50 border border-saffron-200 px-3 py-1.5 rounded-lg text-saffron-800 font-medium">
-                <CheckCircle2 className="w-4.5 h-4.5 text-saffron-600" />
-                <span>{bookings.length} Total Bookings Enrolled</span>
-              </div>
-            </div>
-
-            {bookings.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center max-w-lg mx-auto shadow-md">
-                <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <h4 className="text-lg font-bold text-gray-700 font-display">No Saved Ritual Bookings Found</h4>
-                <p className="text-xs text-gray-500 mt-2 max-w-sm mx-auto leading-relaxed">
-                  You do not have any pending or confirmed bookings active. Explore our directory and complete a booking via secure payment gateway to start!
-                </p>
+            {!currentUser ? (
+              <div className="bg-white rounded-2xl border border-saffron-100 p-12 text-center max-w-lg mx-auto shadow-md space-y-6">
+                <div className="w-16 h-16 rounded-full bg-saffron-50 border border-saffron-100 flex items-center justify-center mx-auto text-saffron-600">
+                  <Lock className="w-7 h-7" />
+                </div>
+                <div>
+                  <h4 className="text-xl font-bold text-gray-800 font-display">Devotee Login Required</h4>
+                  <p className="text-xs text-gray-500 mt-2 max-w-sm mx-auto leading-relaxed">
+                    To access your personalized spiritual bookings dashboard, view scheduled Yajnas, or participate in secure interactive live E-Pujas, please sign into your devotee account.
+                  </p>
+                </div>
                 <button
-                  onClick={() => setActiveTab('pujas')}
-                  className="mt-6 bg-saffron-600 hover:bg-saffron-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition duration-150 cursor-pointer"
+                  type="button"
+                  onClick={() => {
+                    setLoginTab('signin');
+                    setIsLoginModalOpen(true);
+                  }}
+                  className="bg-linear-to-r from-saffron-600 to-amber-500 hover:from-saffron-700 hover:to-amber-600 text-white px-6 py-2.5 rounded-full text-xs font-bold transition duration-150 cursor-pointer shadow hover:shadow-md uppercase tracking-wider mx-auto inline-block"
+                  id="bookings-login-prompt-btn"
                 >
-                  Explore Holy Pujas Catalog
+                  Sign In / Create Account
                 </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {bookings.map((bkg) => (
-                  <div 
-                    key={bkg.id} 
-                    className="bg-white rounded-2xl border border-saffron-100/80 shadow-md p-5 flex flex-col justify-between hover:shadow-lg transition-all duration-300"
-                    id={`booking-record-${bkg.id}`}
-                  >
+            ) : (() => {
+              const userBookings = bookings.filter(
+                (b) => b.customerEmail.toLowerCase() === currentUser.email.toLowerCase()
+              );
+              return (
+                <>
+                  {/* Header summary */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <div>
-                      {/* Top booking badge row */}
-                      <div className="flex justify-between items-start gap-2 mb-3.5 pb-3.5 border-b border-dashed border-gray-100">
-                        <div>
-                          <p className="text-[10px] font-mono text-gray-400 uppercase font-semibold">Booking Reference</p>
-                          <p className="font-mono text-xs font-bold text-saffron-700" id={`booking-id-tag-${bkg.id}`}>{bkg.id}</p>
-                        </div>
-                        <div className="text-right">
-                          <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 border border-green-200 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
-                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                            {bkg.status}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Major Ritual Details */}
-                      <div className="flex gap-4">
-                        <img 
-                          src={bkg.pujaImage} 
-                          alt={bkg.pujaName} 
-                          className="w-16 h-16 rounded-xl object-cover border border-saffron-100 shrink-0"
-                          referrerPolicy="no-referrer"
-                        />
-                        <div>
-                          <h4 className="text-lg font-bold text-gray-900 font-display leading-tight">{bkg.pujaName}</h4>
-                          <p className="text-xs text-saffron-600 font-semibold mt-1">{bkg.packageName}</p>
-                          <p className="text-[11px] text-gray-500 font-mono mt-0.5 font-semibold flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5 text-orange-500" />
-                            <span>Scheduled: {new Date(bkg.dateTime).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(bkg.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Devotee Metadata Summary */}
-                      <div className="mt-4 bg-saffron-50/20 border border-saffron-100/40 rounded-xl p-3 grid grid-cols-2 gap-y-2 gap-x-4 text-xs">
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase font-semibold">Devotee Host</p>
-                          <p className="font-semibold text-gray-700">{bkg.customerName}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase font-semibold">Gothra Chanted</p>
-                          <p className="font-semibold text-gray-700">{bkg.gothra}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase font-semibold">Nakshatra Star</p>
-                          <p className="font-semibold text-gray-700">{bkg.nakshatra || "Universal"}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase font-semibold">Recitation Language</p>
-                          <p className="font-semibold text-gray-700">{bkg.language}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase font-semibold">Ceremonial Mode</p>
-                          <p className="font-bold text-saffron-700 uppercase flex items-center gap-1 text-[11px]">
-                            {bkg.mode === 'e-puja' ? (
-                              <>
-                                <Globe className="w-3.5 h-3.5 text-blue-500" />
-                                <span>Interactive E-Puja</span>
-                              </>
-                            ) : (
-                              <>
-                                <MapPin className="w-3.5 h-3.5 text-red-500" />
-                                <span>At Devotee Home</span>
-                              </>
-                            )}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase font-semibold">Dakshina Settlement</p>
-                          <p className="font-bold text-gray-800 font-mono">₹{bkg.price.toLocaleString()} Paid</p>
-                        </div>
-                      </div>
-
-                      {bkg.address && (
-                        <div className="mt-3 p-2.5 bg-gray-50 border border-gray-100 rounded-lg text-xs leading-normal">
-                          <strong className="text-gray-500 font-semibold uppercase text-[10px] block">Priest Visit Location:</strong>
-                          <span className="text-gray-600 font-medium inline-block mt-0.5">{bkg.address}</span>
-                        </div>
-                      )}
-
-                      {bkg.notes && (
-                        <p className="text-xs text-gray-500 italic mt-3 pl-2.5 border-l-2 border-saffron-300">
-                          "Sankalpa note: {bkg.notes}"
-                        </p>
-                      )}
+                      <h3 className="text-2xl font-extrabold text-saffron-800 font-display">Devotee Booking Records</h3>
+                      <p className="text-xs text-gray-500">Secure digital dashboard tracking active Yajnas & Priest schedules</p>
                     </div>
-
-                    {/* Dashboard actions row */}
-                    <div className="mt-5 pt-4 border-t border-gray-150 flex flex-wrap gap-2 justify-between items-center bg-gray-50/50 p-2.5 rounded-xl">
-                      <div className="text-[11px] text-gray-400 font-medium flex items-center gap-1">
-                        <ShieldCheck className="w-3.5 h-3.5 text-green-600" />
-                        <span>MCI Secure verified txn</span>
-                      </div>
-
-                      <div className="flex gap-2 text-xs">
-                        {/* If E-Puja, provide interactive Virtual Mandir experience */}
-                        {bkg.mode === 'e-puja' ? (
-                          <button
-                            onClick={() => setActiveEpujaLive(bkg)}
-                            className="bg-linear-to-r from-saffron-600 to-saffron-500 text-white font-bold px-4 py-2 rounded-xl transition duration-150 flex items-center gap-1.5 shadow-md hover:shadow-lg cursor-pointer"
-                            id={`join-epuja-btn-${bkg.id}`}
-                          >
-                            <Play className="w-3.5 h-3.5 text-white animate-pulse" />
-                            <span>Join Live Virtual Puja Altar</span>
-                          </button>
-                        ) : (
-                          <div className="bg-amber-100/60 text-amber-900 border border-amber-200 text-[11px] font-semibold px-3 py-2 rounded-xl flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-orange-600 animate-ping"></span>
-                            <span>Pandit Ji dispatched on muhurat</span>
-                          </div>
-                        )}
-                        
-                        <button
-                          onClick={() => {
-                            alert(`\n--- Pooja4Panditji Receipt ---\n\nBooking ID: ${bkg.id}\nDevotee: ${bkg.customerName}\nPuja Selected: ${bkg.pujaName}\nDakshina Total: ₹${bkg.price}\nPayment Mode: ${bkg.paymentMethod}\nStatus: ${bkg.status.toUpperCase()}\n\nVerified Securely via SSL Gateways.`);
-                          }}
-                          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-xl transition duration-150 flex items-center gap-1 font-semibold cursor-pointer"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                          <span>Invoice</span>
-                        </button>
-                      </div>
+                    <div className="flex items-center gap-2 text-xs bg-saffron-100/50 border border-saffron-200 px-3 py-1.5 rounded-lg text-saffron-800 font-medium">
+                      <CheckCircle2 className="w-4.5 h-4.5 text-saffron-600" />
+                      <span>{userBookings.length} Total Bookings Enrolled</span>
                     </div>
-
                   </div>
-                ))}
-              </div>
-            )}
+
+                  {userBookings.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center max-w-lg mx-auto shadow-md">
+                      <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                      <h4 className="text-lg font-bold text-gray-700 font-display">No Saved Ritual Bookings Found</h4>
+                      <p className="text-xs text-gray-500 mt-2 max-w-sm mx-auto leading-relaxed">
+                        Pranam {currentUser.fullName}, you have no pending or confirmed bookings active under <span className="font-semibold text-gray-750 font-mono text-[10px]">{currentUser.email}</span>. Explore our directory and complete a booking via secure payment gateway to start!
+                      </p>
+                      <button
+                        onClick={() => setActiveTab('pujas')}
+                        className="mt-6 bg-saffron-600 hover:bg-saffron-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition duration-150 cursor-pointer"
+                      >
+                        Explore Holy Pujas Catalog
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {userBookings.map((bkg) => (
+                        <div 
+                          key={bkg.id} 
+                          className="bg-white rounded-2xl border border-saffron-100/80 shadow-md p-5 flex flex-col justify-between hover:shadow-lg transition-all duration-300"
+                          id={`booking-record-${bkg.id}`}
+                        >
+                          <div>
+                            {/* Top booking badge row */}
+                            <div className="flex justify-between items-start gap-2 mb-3.5 pb-3.5 border-b border-dashed border-gray-100">
+                              <div>
+                                <p className="text-[10px] font-mono text-gray-400 uppercase font-semibold">Booking Reference</p>
+                                <p className="font-mono text-xs font-bold text-saffron-700" id={`booking-id-tag-${bkg.id}`}>{bkg.id}</p>
+                              </div>
+                              <div className="text-right">
+                                <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 border border-green-200 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                                  {bkg.status}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Major Ritual Details */}
+                            <div className="flex gap-4">
+                              <img 
+                                src={bkg.pujaImage} 
+                                alt={bkg.pujaName} 
+                                className="w-16 h-16 rounded-xl object-cover border border-saffron-100 shrink-0"
+                                referrerPolicy="no-referrer"
+                              />
+                              <div>
+                                <h4 className="text-lg font-bold text-gray-900 font-display leading-tight">{bkg.pujaName}</h4>
+                                <p className="text-xs text-saffron-600 font-semibold mt-1">{bkg.packageName}</p>
+                                <p className="text-[11px] text-gray-500 font-mono mt-0.5 font-semibold flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5 text-orange-500" />
+                                  <span>Scheduled: {new Date(bkg.dateTime).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(bkg.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Devotee Metadata Summary */}
+                            <div className="mt-4 bg-saffron-50/20 border border-saffron-100/40 rounded-xl p-3 grid grid-cols-2 gap-y-2 gap-x-4 text-xs">
+                              <div>
+                                <p className="text-[10px] text-gray-400 uppercase font-semibold">Devotee Host</p>
+                                <p className="font-semibold text-gray-700">{bkg.customerName}</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-gray-400 uppercase font-semibold">Gothra Chanted</p>
+                                <p className="font-semibold text-gray-700">{bkg.gothra}</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-gray-400 uppercase font-semibold">Nakshatra Star</p>
+                                <p className="font-semibold text-gray-700">{bkg.nakshatra || "Universal"}</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-gray-400 uppercase font-semibold">Recitation Language</p>
+                                <p className="font-semibold text-gray-700">{bkg.language}</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-gray-400 uppercase font-semibold">Ceremonial Mode</p>
+                                <p className="font-bold text-saffron-700 uppercase flex items-center gap-1 text-[11px]">
+                                  {bkg.mode === 'e-puja' ? (
+                                    <>
+                                      <Globe className="w-3.5 h-3.5 text-blue-500" />
+                                      <span>Interactive E-Puja</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <MapPin className="w-3.5 h-3.5 text-red-500" />
+                                      <span>At Devotee Home</span>
+                                    </>
+                                  )}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-gray-400 uppercase font-semibold">Dakshina Settlement</p>
+                                <p className="font-bold text-gray-800 font-mono">₹{bkg.price.toLocaleString()} Paid</p>
+                              </div>
+                            </div>
+
+                            {bkg.address && (
+                              <div className="mt-3 p-2.5 bg-gray-50 border border-gray-100 rounded-lg text-xs leading-normal">
+                                <strong className="text-gray-500 font-semibold uppercase text-[10px] block">Priest Visit Location:</strong>
+                                <span className="text-gray-600 font-medium inline-block mt-0.5">{bkg.address}</span>
+                              </div>
+                            )}
+
+                            {bkg.notes && (
+                              <p className="text-xs text-gray-500 italic mt-3 pl-2.5 border-l-2 border-saffron-300">
+                                "Sankalpa note: {bkg.notes}"
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Dashboard actions row */}
+                          <div className="mt-5 pt-4 border-t border-gray-150 flex flex-wrap gap-2 justify-between items-center bg-gray-50/50 p-2.5 rounded-xl">
+                            <div className="text-[11px] text-gray-400 font-medium flex items-center gap-1">
+                              <ShieldCheck className="w-3.5 h-3.5 text-green-600" />
+                              <span>MCI Secure verified txn</span>
+                            </div>
+
+                            <div className="flex gap-2 text-xs">
+                              {/* If E-Puja, provide interactive Virtual Mandir experience */}
+                              {bkg.mode === 'e-puja' ? (
+                                <button
+                                  onClick={() => setActiveEpujaLive(bkg)}
+                                  className="bg-linear-to-r from-saffron-600 to-saffron-500 text-white font-bold px-4 py-2 rounded-xl transition duration-150 flex items-center gap-1.5 shadow-md hover:shadow-lg cursor-pointer"
+                                  id={`join-epuja-btn-${bkg.id}`}
+                                >
+                                  <Play className="w-3.5 h-3.5 text-white animate-pulse" />
+                                  <span>Join Live Virtual Puja Altar</span>
+                                </button>
+                              ) : (
+                                <div className="bg-amber-100/60 text-amber-900 border border-amber-200 text-[11px] font-semibold px-3 py-2 rounded-xl flex items-center gap-1.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-orange-600 animate-ping"></span>
+                                  <span>Pandit Ji dispatched on muhurat</span>
+                                </div>
+                              )}
+                              
+                              <button
+                                onClick={() => {
+                                  alert(`\n--- Pooja4Panditji Receipt ---\n\nBooking ID: ${bkg.id}\nDevotee: ${bkg.customerName}\nPuja Selected: ${bkg.pujaName}\nDakshina Total: ₹${bkg.price}\nPayment Mode: ${bkg.paymentMethod}\nStatus: ${bkg.status.toUpperCase()}\n\nVerified Securely via SSL Gateways.`);
+                                }}
+                                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-xl transition duration-150 flex items-center gap-1 font-semibold cursor-pointer"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                <span>Invoice</span>
+                              </button>
+                            </div>
+                          </div>
+
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
           </div>
         )}
