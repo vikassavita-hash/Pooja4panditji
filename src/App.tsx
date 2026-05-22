@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Navbar from './components/Navbar';
 import PujaCard from './components/PujaCard';
 import { PUJAS_DATA } from './data/pujas';
-import { Puja, Booking, ChatMessage, PujaPackage, PortalSettings } from './types';
+import { Puja, Booking, ChatMessage, PujaPackage, PortalSettings, UserAccount } from './types';
 import AdminPortal from './components/AdminPortal';
 import { 
   Sparkles, ShieldCheck, CreditCard, Clock, MapPin, Globe, CheckCircle2, 
@@ -27,28 +27,50 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('pooja4panditji_pujas_catalog', JSON.stringify(pujas));
+    // Persist to backend database
+    fetch('/api/pujas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(pujas)
+    }).catch(err => console.error("Could not sync pujas to backend:", err));
   }, [pujas]);
 
   const [settings, setSettings] = useState<PortalSettings>(() => {
     const saved = localStorage.getItem('pooja4panditji_settings');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (err) {
-        console.error("Failed to parse local storage settings.", err);
-      }
-    }
-    return {
+    const defaults = {
       contactPhone: '+91 98851 10082',
       whatsappNumber: '+91 98851 10082',
       geminiApiKey: '',
       upiId: 'shastri.pandit108@okhdfcbank',
-      upiQrUrl: ''
+      upiQrUrl: '',
+      panditName: 'Shyam Guru ji',
+      panditCertification: 'Certified by Mathura Vedic Board',
+      panditBio: 'Renowned scholar of Astro-Vedic rituals and Yajnas, directly descended from traditional priestly line of Mathura. Specialist in dynamic Kundali matchmaking and Shubh Muhurat determinations.',
+      showExplorePujasTab: true,
+      showAiPanditTab: true,
+      showMyBookingsTab: true,
+      showAdminPortalTab: true,
+      devoteeTerms: '1. All devotion services (Shradha Dakshina) are verified secure.\n2. The simulated handshakes are for instructional, direct, offline and virtual connect.\n3. By booking any puja, the devotee agrees to provide accurate Birth coordinates, Gothra and Nakshatra.\n4. Standard 24 Hours validity applies to digital chatbot and voice consult channels.\n5. Vedic rituals represent deep lineage devotion.'
     };
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return { ...defaults, ...parsed };
+      } catch (err) {
+        console.error("Failed to parse local storage settings.", err);
+      }
+    }
+    return defaults;
   });
 
   useEffect(() => {
     localStorage.setItem('pooja4panditji_settings', JSON.stringify(settings));
+    // Persist to backend database
+    fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    }).catch(err => console.error("Could not sync settings to backend:", err));
   }, [settings]);
 
   // Devotee state structures
@@ -77,6 +99,12 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('pooja4panditji_users', JSON.stringify(users));
+    // Persist to backend database
+    fetch('/api/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(users)
+    }).catch(err => console.error("Could not sync users to backend:", err));
   }, [users]);
 
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
@@ -99,8 +127,109 @@ export default function App() {
     }
   }, [currentUser]);
 
+  // Initial Fetch synchronizer on Mount to pull latest persistent backend data
+  useEffect(() => {
+    async function syncBackendData() {
+      try {
+        // 1. Sync Settings
+        const settingsRes = await fetch('/api/settings');
+        if (settingsRes.ok) {
+          const settingsData = await settingsRes.json();
+          if (settingsData && settingsData.contactPhone) {
+            setSettings(settingsData);
+          }
+        }
+
+        // 2. Sync Catalog
+        const pujasRes = await fetch('/api/pujas');
+        if (pujasRes.ok) {
+          const pujasList = await pujasRes.json();
+          if (Array.isArray(pujasList) && pujasList.length > 0) {
+            setPujas(pujasList);
+          }
+        }
+
+        // 3. Sync Users
+        const usersRes = await fetch('/api/users');
+        if (usersRes.ok) {
+          const usersList = await usersRes.json();
+          if (Array.isArray(usersList) && usersList.length > 0) {
+            setUsers(usersList);
+          }
+        }
+
+        // 4. Sync Bookings
+        const bookingsRes = await fetch('/api/bookings');
+        if (bookingsRes.ok) {
+          const bookingsList = await bookingsRes.json();
+          if (Array.isArray(bookingsList)) {
+            setBookings(bookingsList);
+          }
+        }
+      } catch (error) {
+        console.error("Initial backend synchronization pause (server offline or compiling):", error);
+      }
+    }
+    syncBackendData();
+  }, []);
+
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [loginTab, setLoginTab] = useState<'signin' | 'signup'>('signin');
+
+  const [hasDirectPanditAccess, setHasDirectPanditAccess] = useState<boolean>(false);
+  const [directPanditExpiry, setDirectPanditExpiry] = useState<number | null>(null);
+  const [previouslyPaidPandit, setPreviouslyPaidPandit] = useState<boolean>(false);
+
+  const [isConsultModalOpen, setIsConsultModalOpen] = useState(false);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  const [consultFormName, setConsultFormName] = useState('');
+  const [consultFormPhone, setConsultFormPhone] = useState('');
+  const [consultFormGothra, setConsultFormGothra] = useState('');
+  const [consultFormNotes, setConsultFormNotes] = useState('');
+  const [consultPayMethod, setConsultPayMethod] = useState<'upi' | 'card'>('upi');
+
+  // Helper to re-evaluate the active status and expiry
+  const updateAccessFromStorage = () => {
+    if (!currentUser) {
+      setHasDirectPanditAccess(false);
+      setDirectPanditExpiry(null);
+      setPreviouslyPaidPandit(false);
+      return;
+    }
+    const expiryKey = `pooja4panditji_expiry_${currentUser.email}`;
+    const paidKey = `pooja4panditji_previously_paid_${currentUser.email}`;
+    
+    const savedExpiry = localStorage.getItem(expiryKey);
+    const hasPaidBefore = localStorage.getItem(paidKey) === 'true';
+    
+    setPreviouslyPaidPandit(hasPaidBefore);
+
+    if (savedExpiry) {
+      const expiryTime = parseInt(savedExpiry, 10);
+      if (expiryTime > Date.now()) {
+        setHasDirectPanditAccess(true);
+        setDirectPanditExpiry(expiryTime);
+      } else {
+        setHasDirectPanditAccess(false);
+        setDirectPanditExpiry(expiryTime);
+      }
+    } else {
+      setHasDirectPanditAccess(false);
+      setDirectPanditExpiry(null);
+    }
+  };
+
+  useEffect(() => {
+    updateAccessFromStorage();
+  }, [currentUser]);
+
+  // Periodic check (every 10 seconds) to auto-expire
+  useEffect(() => {
+    const timer = setInterval(() => {
+      updateAccessFromStorage();
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [currentUser]);
 
   const [activeCategory, setActiveCategory] = useState<string>('all');
   
@@ -148,6 +277,12 @@ export default function App() {
   // Save bookings to localStorage
   useEffect(() => {
     localStorage.setItem('pooja4panditji_bookings', JSON.stringify(bookings));
+    // Persist to backend database
+    fetch('/api/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(bookings)
+    }).catch(err => console.error("Could not sync bookings to backend:", err));
   }, [bookings]);
 
   // Booking process states
@@ -209,7 +344,17 @@ export default function App() {
 
   // Chat window states
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
-    const saved = localStorage.getItem('pooja4panditji_chat');
+    // Initial load: check if a user is pre-selected
+    const initialUser = localStorage.getItem('pooja4panditji_current_user');
+    let email = 'guest';
+    if (initialUser) {
+      try {
+        const u = JSON.parse(initialUser);
+        if (u && u.email) email = u.email;
+      } catch (_) {}
+    }
+    const key = `pooja4panditji_chat_${email}`;
+    const saved = localStorage.getItem(key);
     if (saved) {
       try { return JSON.parse(saved); } catch(_) {}
     }
@@ -217,7 +362,7 @@ export default function App() {
       {
         id: 'welcome-msg',
         sender: 'pandit',
-        text: 'Pranam, dear devotee! 🙏 I am Pandit Shastri Dev Ji. Welcome to Pooja4Panditji. I am pleased to offer spiritual counsel, explain the inner benefits of cosmic Havans, or help you identify the right ritual for your family’s happiness, safety, prosperity, and spiritual health. Which aspect of your life might I bless or guide today?',
+        text: 'Pranam, dear devotee! 🙏 Welcome to Pooja4Panditji. I am pleased to offer spiritual counsel, explain the inner benefits of cosmic Havans, or help you identify the right ritual for your family’s happiness, safety, prosperity, and spiritual health. Which aspect of your life might I bless or guide today?',
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
     ];
@@ -225,12 +370,47 @@ export default function App() {
   
   const [userChatInput, setUserChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [selectedChatLanguage, setSelectedChatLanguage] = useState<string>('multilingual');
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
-  // Save chat to localStorage
+  // Dynamically load user-specific or guest-specific chat history when login status changes
   useEffect(() => {
-    localStorage.setItem('pooja4panditji_chat', JSON.stringify(chatMessages));
-  }, [chatMessages]);
+    const email = currentUser ? currentUser.email : 'guest';
+    const key = `pooja4panditji_chat_${email}`;
+    const saved = localStorage.getItem(key);
+    const customWelcome = `Pranam, dear devotee! 🙏 I am ${settings.panditName || 'Shyam Guru ji'}, ${settings.panditCertification || 'certified by Mathura'}. Welcome to Pooja4Panditji Devotee Portal. I am pleased to offer spiritual counsel in multiple languages, explain the inner benefits of cosmic Havans, or help you identify the right ritual for your family’s happiness, safety, prosperity, and spiritual health. Which aspect of your life might I bless or guide today?`;
+
+    if (saved) {
+      try {
+        setChatMessages(JSON.parse(saved));
+      } catch (_) {
+        setChatMessages([
+          {
+            id: 'welcome-msg',
+            sender: 'pandit',
+            text: customWelcome,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }
+        ]);
+      }
+    } else {
+      setChatMessages([
+        {
+          id: 'welcome-msg',
+          sender: 'pandit',
+          text: customWelcome,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+    }
+  }, [currentUser, settings.panditName, settings.panditCertification]);
+
+  // Save chat to the correct user-specific template key in localStorage
+  useEffect(() => {
+    const email = currentUser ? currentUser.email : 'guest';
+    const key = `pooja4panditji_chat_${email}`;
+    localStorage.setItem(key, JSON.stringify(chatMessages));
+  }, [chatMessages, currentUser]);
 
   // Scroll to bottom of chat
   useEffect(() => {
@@ -405,7 +585,11 @@ export default function App() {
         },
         body: JSON.stringify({ 
           messages: updatedMessages,
-          customApiKey: settings.geminiApiKey 
+          customApiKey: settings.geminiApiKey,
+          language: selectedChatLanguage,
+          panditName: settings.panditName,
+          panditCertification: settings.panditCertification,
+          panditBio: settings.panditBio
         }),
       });
 
@@ -432,6 +616,74 @@ export default function App() {
     } finally {
       setChatLoading(false);
     }
+  };
+
+  const handleConsultSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!consultFormName.trim() || !consultFormPhone.trim()) {
+      alert("Please fill your host name and mobile coordinates first.");
+      return;
+    }
+    
+    // Calculate price based on whether they had previous access
+    const isRenewal = previouslyPaidPandit;
+    const finalPrice = isRenewal ? 125 : 251;
+    
+    // Simulate premium unlock process
+    const transactionId = `PAY-TXN-${Math.floor(100000 + Math.random() * 900000)}`;
+    const newBooking: Booking = {
+      id: `CNS-${Math.floor(10000 + Math.random() * 90000)}`,
+      pujaId: 'live-consult',
+      pujaName: 'Live Phone & 1-on-1 Pandit Chat',
+      pujaImage: 'https://images.unsplash.com/photo-1609137144690-3f71c4c9540b?auto=format&fit=crop&q=80&w=200',
+      customerName: consultFormName,
+      customerPhone: consultFormPhone,
+      customerEmail: currentUser?.email || 'devotee@pooja4panditji.com',
+      gothra: consultFormGothra || "Kashyap (Universal/No Gothra)",
+      nakshatra: "Universal",
+      sankalpNames: consultFormName,
+      mode: 'e-puja',
+      dateTime: new Date().toISOString(),
+      language: 'Hindi & Sanskrit',
+      packageId: 'standard',
+      packageName: isRenewal ? 'Premium Live Astral Guidance (50% Renewal)' : 'Premium Live Astral Guidance',
+      price: finalPrice,
+      includeSamagriKit: false,
+      notes: consultFormNotes || "Direct Astrological chat query & sacred mobile call helpline request.",
+      status: 'confirmed',
+      paymentId: transactionId,
+      paymentMethod: consultPayMethod === 'upi' ? 'UPI Secure Transfer' : 'Verified Secure Card Gateway',
+      meetingLink: 'https://meet.google.com/ais-live-consult',
+      transactionDateTime: new Date().toISOString(),
+      otpVerified: true
+    };
+
+    setBookings(prev => [newBooking, ...prev]);
+    
+    const expiryTime = Date.now() + 24 * 60 * 60 * 1000;
+    const email = currentUser?.email || 'guest';
+    const expiryKey = `pooja4panditji_expiry_${email}`;
+    const paidKey = `pooja4panditji_previously_paid_${email}`;
+    
+    localStorage.setItem(expiryKey, expiryTime.toString());
+    localStorage.setItem(paidKey, 'true');
+    localStorage.setItem('pooja4panditji_has_direct_pandit', 'true');
+    
+    setIsConsultModalOpen(false);
+
+    // Recalculate and update the active state
+    setTimeout(() => {
+      updateAccessFromStorage();
+    }, 10);
+
+    // Add immediate success message in chat feed
+    const upgradedMessage: ChatMessage = {
+      id: `pandit-upgrade-${Date.now()}`,
+      sender: 'pandit',
+      text: `🕉️ *Om Shanti! Deep pranams, dear host ${consultFormName}.* 🕉️\n\nYour Shradha Dakshina of *₹${finalPrice}* ${isRenewal ? '(with 50% Renewal Discount applied!)' : ''} has been certified securely (Txn: ${transactionId}).\n\nYou have successfully unlocked **24 Hours Unlimited Direct Chat & Call Hotline** with me.\n\nI will personally call you on your certified phone (${consultFormPhone}) or reach out on WhatsApp within the next **15 minutes** to guide you regarding Shubh Muhurats, customized planetary charts, and your family's dynamic Nakshatra aspects.\n\nYour premium access is valid until **${new Date(expiryTime).toLocaleString()}** (24 Hours from now).\n\nHow can I serve your metaphysical journey right now? Please state your questions freely.`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setChatMessages(prev => [...prev, upgradedMessage]);
   };
 
   const triggerChatPill = (text: string) => {
@@ -499,6 +751,7 @@ export default function App() {
         currentUser={currentUser}
         onLogout={() => {
           setCurrentUser(null);
+          setActiveTab('pujas');
           // reset form triggers if logged out
           setCustomerName('');
           setCustomerPhone('');
@@ -642,17 +895,12 @@ export default function App() {
                 <p className="text-xs text-amber-800/80 mt-1.5 leading-relaxed">
                   Yes! All Standard and Premium configurations contain premium high-grade Vedic samagri cargo (gangajal, camphor, kashi holy threads, herbs) dispatched 3 days prior. No runarounds or missing materials at the last minute!
                 </p>
-              </div>
-              <div className="bg-white p-4 rounded-xl border border-amber-200">
-                <span className="text-[10px] uppercase tracking-wider font-bold text-saffron-600 block">Vedic Muhurat Guarantee</span>
-                <p className="text-xs text-gray-600 leading-relaxed mt-1">
-                  We calculate custom stellar alignments based on your Nakshatra, Gothra, and birth coordinates to pinpoint perfect starting seconds.
-                </p>
                 <button 
                   onClick={() => setActiveTab('chat')} 
-                  className="mt-2.5 text-xs text-saffron-700 font-bold flex items-center gap-1 hover:text-saffron-800 transition-colors"
+                  className="mt-2.5 text-xs text-saffron-700 font-bold flex items-center gap-1 hover:text-saffron-800 transition-colors cursor-pointer"
+                  type="button"
                 >
-                  Consult Muhurat with Shastri Dev Ji <ChevronRight className="w-3.5 h-3.5" />
+                  Consult Muhurat with {settings.panditName || 'Shyam Guru ji'} <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -660,142 +908,273 @@ export default function App() {
           </div>
         )}
 
-        {/* TAB 2: PANDIT JI AI CHATBOT (SHASTRI DEV JI) */}
-        {activeTab === 'chat' && (
-          <div className="max-w-4xl mx-auto bg-white rounded-2xl border border-saffron-100 shadow-xl overflow-hidden flex flex-col h-[650px] animate-fadeIn" id="pandit-chatbot-view">
-            
-            {/* Chatbot Header */}
-            <div className="p-4 bg-linear-to-r from-saffron-600 to-saffron-700 text-white flex items-center justify-between border-b border-saffron-700">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="w-12 h-12 rounded-full bg-amber-100 border-2 border-gold-300 flex items-center justify-center text-2xl shadow-inner select-none">
-                    👳🏽
-                  </div>
-                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse"></span>
-                </div>
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="font-bold font-display text-base tracking-wide text-white">Pandit Shastri Dev Ji</h3>
-                    <span className="bg-gold-500 text-saffron-950 text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase">Veda Acharya</span>
-                  </div>
-                  <p className="text-xs text-saffron-100 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-300"></span>
-                    Online & Meditating on Devotee Enquiries
-                  </p>
-                </div>
-              </div>
+        {/* TAB 2: PANDIT JI AI CHATBOT */}
+        {activeTab === 'chat' && (() => {
+          const userMsgsCount = chatMessages.filter(msg => msg.sender === 'user').length;
+          return (
+            <div className="max-w-4xl mx-auto bg-white rounded-2xl border border-saffron-100 shadow-xl overflow-hidden flex flex-col h-[650px] animate-fadeIn" id="pandit-chatbot-view">
               
-              <div className="flex items-center gap-2.5 text-xs text-saffron-50">
-                <div className="hidden sm:block text-right bg-white/10 px-3 py-1 bg-opacity-10 rounded-lg">
-                  <p className="text-[10px] text-orange-200">Kashi Vidyapeeth Scholar</p>
-                  <p className="font-bold font-display text-gold-100">📞 Live Audio Consults Enabled</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Chat Log Window */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-saffron-50/10 space-y-4 font-sans" id="chat-messages-container">
-              
-              {chatMessages.map((msg) => (
-                <div 
-                  key={msg.id} 
-                  className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-slideUp`}
-                >
-                  <div className={`flex items-start gap-2.5 max-w-[85%] ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
-                    
-                    {/* Avatar icon */}
-                    <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-sm shrink-0 border border-saffron-200 shadow-xs select-none">
-                      {msg.sender === 'user' ? '👤' : '👳🏽'}
+              {/* Chatbot Header */}
+              <div className="p-4 bg-linear-to-r from-saffron-600 to-saffron-700 text-white flex items-center justify-between border-b border-saffron-700">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="w-12 h-12 rounded-full bg-amber-100 border-2 border-gold-300 flex items-center justify-center text-2xl shadow-inner select-none">
+                      {settings.panditImage || '👳🏽'}
                     </div>
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse"></span>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="font-bold font-display text-base tracking-wide text-white">{settings.panditName || 'Shyam Guru ji'}</h3>
+                      <span className="bg-gold-500 text-saffron-950 text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase">Sanskrit Acharya</span>
+                    </div>
+                    <p className="text-xs text-saffron-100 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-300"></span>
+                      Online & Meditating on Devotee Enquiries
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2.5 text-xs text-saffron-50">
+                  <div className="hidden sm:block text-right bg-white/10 px-3 py-1 bg-opacity-10 rounded-lg">
+                    <p className="text-[10px] text-orange-200">{settings.panditCertification || 'Certified by Mathura'}</p>
+                    <p className="font-bold font-display text-gold-100">📞 Live Audio Consults Enabled</p>
+                  </div>
+                </div>
+              </div>
 
-                    {/* Chat Bubble card */}
-                    <div className={`p-4 rounded-2xl shadow-xs border ${
-                      msg.sender === 'user' 
-                        ? 'bg-linear-to-br from-saffron-500 to-saffron-600 text-white border-saffron-600 rounded-tr-none' 
-                        : 'bg-white text-gray-800 border-saffron-100 rounded-tl-none'
-                    }`}>
-                      <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                        {msg.text}
-                      </div>
-                      <span className={`block text-[10px] mt-1.5 text-right ${
-                        msg.sender === 'user' ? 'text-saffron-100' : 'text-gray-400'
-                      }`}>
-                        {msg.timestamp}
+              {/* Multilingual communication bar */}
+              <div className="bg-saffron-50/70 border-b border-saffron-100 px-4 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                <span className="text-saffron-900 font-bold flex items-center gap-1.5 shrink-0">
+                  🗣️ Communication Language:
+                </span>
+                <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto no-scrollbar scroll-smooth">
+                  {[
+                    { code: 'multilingual', label: '🔀 Multilingual' },
+                    { code: 'Hindi', label: '🇮🇳 हिंदी (Hindi)' },
+                    { code: 'English', label: '🇬🇧 English' },
+                    { code: 'Sanskrit', label: '🐚 संस्कृत (Sanskrit)' },
+                    { code: 'Tamil', label: '🌸 தமிழ் (Tamil)' },
+                    { code: 'Telugu', label: '☀️ తెలుగు (Telugu)' },
+                    { code: 'Gujarati', label: '🌾 Gujarati' }
+                  ].map((lang) => (
+                    <button
+                      key={lang.code}
+                      type="button"
+                      onClick={() => setSelectedChatLanguage(lang.code)}
+                      className={`px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap border ${
+                        selectedChatLanguage === lang.code
+                          ? 'bg-saffron-600 border-saffron-600 text-white shadow-xs'
+                          : 'bg-white border-saffron-200 text-saffron-800 hover:bg-saffron-50'
+                      }`}
+                    >
+                      {lang.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Direct Pandit call bar */}
+              {!hasDirectPanditAccess ? (
+                <div className="bg-amber-50/90 border-b border-amber-200 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
+                  <span className="text-amber-900 font-medium flex items-center gap-2 text-center sm:text-left">
+                    <span className="flex h-2 w-2 relative shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                    </span>
+                    <span><strong>AI chat has 3 complimentary queries.</strong> Connect with human {settings.panditName || 'Shyam Guru ji'} directly over Voice Call & VIP WhatsApp!</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!currentUser) {
+                        setLoginTab('signin');
+                        setIsLoginModalOpen(true);
+                        alert("Please Sign In first to lock your devotee account and register dynamic consultations.");
+                      } else {
+                        setConsultFormName(currentUser.fullName);
+                        setConsultFormPhone(currentUser.phone);
+                        setConsultFormGothra(currentUser.gothra || '');
+                        setIsConsultModalOpen(true);
+                      }
+                    }}
+                    className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-3 py-1 rounded-lg shadow-xs transition shrink-0 cursor-pointer text-[11px] animate-pulse"
+                  >
+                    {previouslyPaidPandit ? `Renew Call & VIP Chat (₹125)` : `Connect Direct Pandit (₹251)`}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-emerald-50 border-b border-emerald-150 px-4 py-2 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
+                  <span className="text-emerald-900 font-bold flex flex-wrap items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>🌟 VIP Devotee Access Active: Unlimited chats & live voice call helpline active!</span>
+                    {directPanditExpiry && (
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-medium px-2 py-0.5 rounded-full">
+                        {Math.max(1, Math.ceil((directPanditExpiry - Date.now()) / (1000 * 60 * 60)))} hours left (ends {new Date(directPanditExpiry).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})
                       </span>
-                    </div>
-
-                  </div>
-                </div>
-              ))}
-
-              {/* Chatbot typing loading animation */}
-              {chatLoading && (
-                <div className="flex justify-start animate-pulse">
-                  <div className="flex items-start gap-2.5 max-w-[80%]">
-                    <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-sm shrink-0 border border-saffron-200">
-                      👳🏽
-                    </div>
-                    <div className="p-4 rounded-2xl bg-white text-gray-800 border border-saffron-100 rounded-tl-none shadow-xs">
-                      <div className="flex items-center gap-1 text-xs text-gray-400 font-medium">
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-saffron-500" />
-                        <span>Pandit Ji is consulting astral almanac/scriptures...</span>
-                      </div>
-                      <div className="flex gap-1 mt-2">
-                        <span className="w-2 h-2 rounded-full bg-saffron-400 animate-bounce delay-100"></span>
-                        <span className="w-2 h-2 rounded-full bg-saffron-500 animate-bounce delay-200"></span>
-                        <span className="w-2 h-2 rounded-full bg-saffron-600 animate-bounce delay-300"></span>
-                      </div>
-                    </div>
-                  </div>
+                    )}
+                  </span>
+                  <a
+                    href={`https://wa.me/${(settings.whatsappNumber || '+91 98851 10082').replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    referrerPolicy="no-referrer"
+                    className="bg-emerald-650 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-md shadow-xs text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer transition shrink-0"
+                  >
+                    💬 Live WhatsApp
+                  </a>
                 </div>
               )}
 
-              <div ref={chatBottomRef}></div>
+              {/* Chat Log Window */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-saffron-50/10 space-y-4 font-sans" id="chat-messages-container">
+                
+                {chatMessages.map((msg) => (
+                  <div 
+                    key={msg.id} 
+                    className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-slideUp`}
+                  >
+                    <div className={`flex items-start gap-2.5 max-w-[85%] ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+                      
+                      {/* Avatar icon */}
+                      <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-sm shrink-0 border border-saffron-200 shadow-xs select-none">
+                        {msg.sender === 'user' ? '👤' : '👳🏽'}
+                      </div>
+
+                      {/* Chat Bubble card */}
+                      <div className={`p-4 rounded-2xl shadow-xs border ${
+                        msg.sender === 'user' 
+                          ? 'bg-linear-to-br from-saffron-500 to-saffron-600 text-white border-saffron-600 rounded-tr-none' 
+                          : 'bg-white text-gray-800 border-saffron-100 rounded-tl-none'
+                      }`}>
+                        <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                          {msg.text}
+                        </div>
+                        <span className={`block text-[10px] mt-1.5 text-right ${
+                          msg.sender === 'user' ? 'text-saffron-100' : 'text-gray-400'
+                        }`}>
+                          {msg.timestamp}
+                        </span>
+                      </div>
+
+                    </div>
+                  </div>
+                ))}
+
+                {/* Chatbot typing loading animation */}
+                {chatLoading && (
+                  <div className="flex justify-start animate-pulse">
+                    <div className="flex items-start gap-2.5 max-w-[80%]">
+                      <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-sm shrink-0 border border-saffron-200">
+                        👳🏽
+                      </div>
+                      <div className="p-4 rounded-2xl bg-white text-gray-800 border border-saffron-100 rounded-tl-none shadow-xs">
+                        <div className="flex items-center gap-1 text-xs text-gray-400 font-medium">
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-saffron-500" />
+                          <span>Pandit Ji is consulting astral almanac/scriptures...</span>
+                        </div>
+                        <div className="flex gap-1 mt-2">
+                          <span className="w-2 h-2 rounded-full bg-saffron-400 animate-bounce delay-100"></span>
+                          <span className="w-2 h-2 rounded-full bg-saffron-500 animate-bounce delay-200"></span>
+                          <span className="w-2 h-2 rounded-full bg-saffron-600 animate-bounce delay-300"></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={chatBottomRef}></div>
+              </div>
+
+              {/* Dynamic Gatekeeper Input or Form */}
+              {userMsgsCount >= 3 && !hasDirectPanditAccess ? (
+                <div className="p-6 bg-linear-to-b from-amber-50 to-orange-50/50 border-t border-saffron-150 text-center space-y-4 animate-fadeIn">
+                  <div className="w-12 h-12 bg-amber-100/90 border border-saffron-300 rounded-full flex items-center justify-center mx-auto text-xl">
+                    🕉️
+                  </div>
+                  <div className="max-w-md mx-auto space-y-1.5">
+                    <h4 className="text-sm font-extrabold text-saffron-850 uppercase tracking-widest font-display">Complimentary AI Queries Completed</h4>
+                    <p className="text-xs text-gray-650 leading-relaxed font-sans">
+                      Pranam Devotee! You have requested 3 free guidance summaries. Continuous astrological deep-dives, specialized Gotra muhurats, and directly discussing with {settings.panditName || 'Shyam Guru ji'} on a personal phone call require a small **Shradha Dakshina (Vedic token)**.
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-sm mx-auto pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!currentUser) {
+                          setLoginTab('signin');
+                          setIsLoginModalOpen(true);
+                          alert("Please Sign In first to lock your devotee account and order standard consultations.");
+                        } else {
+                          setConsultFormName(currentUser.fullName);
+                          setConsultFormPhone(currentUser.phone);
+                          setConsultFormGothra(currentUser.gothra || '');
+                          setIsConsultModalOpen(true);
+                        }
+                      }}
+                      className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-5 py-2.5 rounded-xl transition duration-150 text-xs shadow-md cursor-pointer uppercase tracking-wider flex-1 animate-pulse"
+                    >
+                      {previouslyPaidPandit ? `Renew Call & Chat (₹125)` : `Unlock Direct Pandit (₹251)`}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('pujas')}
+                      className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl text-xs font-semibold cursor-pointer flex-1"
+                    >
+                      Pujas Catalog
+                    </button>
+                  </div>
+                  <p className="text-[10.5px] text-gray-400 font-medium">✨ This unlocks 24 Hours of direct text counseling and premium voice call service.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Prompt Helper Pills */}
+                  <div className="p-3 bg-saffron-50/50 border-t border-saffron-100 overflow-x-auto whitespace-nowrap flex items-center gap-2 text-xs no-scrollbar">
+                    <span className="text-gray-400 font-bold uppercase text-[9px] shrink-0">Ask Swami Ji:</span>
+                    {[
+                      "Which puja helps clear commercial business debts?",
+                      "Suggest a remedial mantra for recovering our sick elders",
+                      "What items are in standard Satyanarayan samagri kit?",
+                      "Can you check dynamic dates for Griha Pravesh home warmth?"
+                    ].map((pillText, i) => (
+                      <button
+                        key={i}
+                        onClick={() => triggerChatPill(pillText)}
+                        className="bg-white hover:bg-saffron-100 text-saffron-700 border border-saffron-150 px-3 py-1.5 rounded-full cursor-pointer transition duration-150 text-xs shadow-xs"
+                      >
+                        {pillText}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Chat Input form */}
+                  <form onSubmit={handleChatSubmit} className="p-3 border-t border-saffron-100 bg-white flex gap-2">
+                    <input
+                      id="chat-input-box"
+                      type="text"
+                      value={userChatInput}
+                      onChange={(e) => setUserChatInput(e.target.value)}
+                      placeholder={hasDirectPanditAccess ? `Type your premium direct query to ${settings.panditName || 'Shyam Guru ji'}...` : `Ask ${settings.panditName || 'Shyam Guru ji'} about Gothras, rituals, package options...`}
+                      className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-saffron-500 focus:border-transparent text-sm text-gray-800"
+                      disabled={chatLoading}
+                    />
+                    <button
+                      type="submit"
+                      className="bg-saffron-600 hover:bg-saffron-700 text-white font-bold px-5 py-2.5 rounded-xl transition duration-150 text-sm flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                      disabled={chatLoading || !userChatInput.trim()}
+                      id="send-chat-btn"
+                    >
+                      <span>{hasDirectPanditAccess ? "Verify & Speak" : "Sankalp Query"}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </form>
+                </>
+              )}
+
             </div>
-
-            {/* Prompt Helper Pills */}
-            <div className="p-3 bg-saffron-50/50 border-t border-saffron-100 overflow-x-auto whitespace-nowrap flex items-center gap-2 text-xs no-scrollbar">
-              <span className="text-gray-400 font-bold uppercase text-[9px] shrink-0">Ask Swami Ji:</span>
-              {[
-                "Which puja helps clear commercial business debts?",
-                "Suggest a remedial mantra for recovering our sick elders",
-                "What items are in standard Satyanarayan samagri kit?",
-                "Can you check dynamic dates for Griha Pravesh home warmth?"
-              ].map((pillText, i) => (
-                <button
-                  key={i}
-                  onClick={() => triggerChatPill(pillText)}
-                  className="bg-white hover:bg-saffron-100 text-saffron-700 border border-saffron-150 px-3 py-1.5 rounded-full cursor-pointer transition duration-150 text-xs shadow-xs"
-                >
-                  {pillText}
-                </button>
-              ))}
-            </div>
-
-            {/* Chat Input form */}
-            <form onSubmit={handleChatSubmit} className="p-3 border-t border-saffron-100 bg-white flex gap-2">
-              <input
-                id="chat-input-box"
-                type="text"
-                value={userChatInput}
-                onChange={(e) => setUserChatInput(e.target.value)}
-                placeholder="Ask Pandit Shastri Dev about Gothras, rituals, package options, or auspicious timings..."
-                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-saffron-500 focus:border-transparent text-sm text-gray-800"
-                disabled={chatLoading}
-              />
-              <button
-                type="submit"
-                className="bg-saffron-600 hover:bg-saffron-700 text-white font-bold px-5 py-2.5 rounded-xl transition duration-150 text-sm flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
-                disabled={chatLoading || !userChatInput.trim()}
-                id="send-chat-btn"
-              >
-                <span>Sankalp Query</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </form>
-
-          </div>
-        )}
+          );
+        })()}
 
         {/* TAB 3: CUSTOMER MY BOOKINGS DASHBOARD */}
         {activeTab === 'bookings' && (
@@ -1052,17 +1431,32 @@ export default function App() {
           <div>
             <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4 font-display">Secure & Safe Portal</h4>
             <p className="text-xs leading-relaxed text-neutral-400 mb-2">
-              All electronic payments are routed via authorized banking gateways. Custom cancellation protocols with standard 100% automatic refunds if booked prior to 24 hours.
+              All electronic payments are routed via authorized banking gateways under strict secure credentials.
             </p>
             <div className="p-3 bg-neutral-800 rounded-lg border border-neutral-700 text-[11px] leading-snug">
-              <p className="text-emerald-400 font-bold">✨ Shastri Dev Ji Support</p>
+              <p className="text-emerald-400 font-bold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>✨ {settings.panditName || 'Shyam Guru ji'} Support</span>
+              </p>
               <p className="text-neutral-400 mt-1">Get immediate live assistance regarding material sourcing or custom family gothras.</p>
-              <button 
-                onClick={() => setActiveTab('chat')} 
-                className="mt-2 text-gold-400 font-bold hover:underline cursor-pointer"
-              >
-                Launch Chatbot Portal
-              </button>
+              <div className="mt-2.5 flex flex-wrap gap-3 items-center">
+                <button 
+                  onClick={() => setActiveTab('chat')} 
+                  className="text-gold-400 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <span>Launch Chatbot</span>
+                </button>
+                <span className="text-neutral-600">|</span>
+                <a 
+                  href={`https://wa.me/${settings.whatsappNumber.replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  referrerPolicy="no-referrer"
+                  className="text-green-400 hover:text-green-300 font-bold flex items-center gap-1 transition"
+                >
+                  <span>💬 Connect on WhatsApp</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -1072,9 +1466,7 @@ export default function App() {
           <div className="flex gap-4 mt-2 sm:mt-0 font-medium">
             <span className="hover:text-neutral-400 cursor-pointer">Privacy Safeguards</span>
             <span>•</span>
-            <span className="hover:text-neutral-400 cursor-pointer">Devotee Terms of Use</span>
-            <span>•</span>
-            <span className="hover:text-neutral-400 cursor-pointer">Payment Refunds Protocol</span>
+            <span className="hover:text-neutral-400 cursor-pointer" onClick={() => setIsTermsModalOpen(true)}>Devotee Terms of Use</span>
           </div>
         </div>
       </footer>
@@ -1838,8 +2230,8 @@ export default function App() {
                   </div>
 
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-neutral-600 text-xs text-left leading-normal">
-                    <p className="font-bold text-orange-950">👳🏽 Message from Pandit Shastri Dev:</p>
-                    <p className="text-xs text-orange-900 mt-1">"Pranam, dear host. Your Sankalp names have been filed in Kashi coordinates. We will contact you on WhatsApp / email to confirm correct flower setups and pure home arrangements. May Lord Shiva clear absolute obstacles!"</p>
+                    <p className="font-bold text-orange-950">👳🏽 Message from Pandit {settings.panditName || 'Shyam Guru ji'}:</p>
+                    <p className="text-xs text-orange-900 mt-1">"Pranam, dear host. Your Sankalp names have been filed in sacred coordinates. We will contact you on WhatsApp / email to confirm correct flower setups and pure home arrangements. May Lord Shiva clear absolute obstacles!"</p>
                   </div>
 
                   <div className="pt-2 flex flex-col sm:flex-row gap-3">
@@ -1862,7 +2254,7 @@ export default function App() {
                       }}
                       className="flex-1 bg-white hover:bg-saffron-50 text-saffron-700 border border-saffron-200 font-bold py-3 rounded-xl text-xs transition duration-150 cursor-pointer"
                     >
-                      Discuss with Shastri Dev Ji
+                      Discuss with {settings.panditName || 'Shyam Guru ji'}
                     </button>
                   </div>
 
@@ -1931,9 +2323,9 @@ export default function App() {
 
                   {/* Active representation representing Pandits interactive webcam */}
                   <div className="relative text-center p-8 space-y-4">
-                    <div className="text-6xl sm:text-7xl select-none animate-pulse">👳🏽</div>
+                    <div className="text-6xl sm:text-7xl select-none animate-pulse">{settings.panditImage || '👳🏽'}</div>
                     <div>
-                      <h4 className="text-gold-200 font-bold font-display text-lg">Pandit Shastri Dev Ji</h4>
+                      <h4 className="text-gold-200 font-bold font-display text-lg">Pandit {settings.panditName || 'Shyam Guru ji'}</h4>
                       <p className="text-[11px] text-gray-400 mt-1">Initiating Panchamrit & Camphor sequence</p>
                     </div>
 
@@ -2256,6 +2648,271 @@ export default function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* DIRECT PANDIT LIVE CONSULTATION SECURE CHECKOUT MODAL */}
+      {isConsultModalOpen && (
+        <div className="fixed inset-0 z-55 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto font-sans animate-fadeIn" id="pandit-consult-checkout-modal">
+          <div className="bg-white rounded-2xl border border-saffron-100 shadow-2xl max-w-lg w-full overflow-hidden text-xs text-gray-700">
+            {/* Header banner */}
+            <div className="bg-gradient-to-r from-saffron-600 to-amber-600 text-white p-5 relative">
+              <button 
+                onClick={() => setIsConsultModalOpen(false)}
+                className="absolute top-4 right-4 text-white/80 hover:text-white font-bold text-base bg-black/10 hover:bg-black/20 w-7 h-7 rounded-full flex items-center justify-center transition"
+                type="button"
+              >
+                ✕
+              </button>
+              <div className="inline-block bg-amber-500 text-saffron-950 font-bold px-2 py-0.5 rounded-full text-[9px] uppercase tracking-wider mb-1">
+                Kashi Astro Hotline
+              </div>
+              <h3 className="text-base font-bold font-display">Book {settings.panditName || 'Shyam Guru ji'} Live Hotline</h3>
+              <p className="text-[10px] text-saffron-100 mt-1">
+                Establish a direct telephonic & custom WhatsApp pipeline for Astrological guidance.
+              </p>
+            </div>
+
+            <form onSubmit={handleConsultSubmit} className="p-5 sm:p-6 space-y-4">
+              
+              {/* Review summary cards */}
+              <div className="bg-amber-50/50 rounded-xl p-3.5 border border-amber-100 grid grid-cols-2 gap-3 items-center">
+                <div>
+                  <p className="text-[10px] text-gray-400 uppercase font-bold">Consultation Service</p>
+                  <p className="font-bold text-saffron-900 text-xs mt-0.5">1-on-1 Phone & WhatsApp Consultation</p>
+                  <p className="text-[10px] text-gray-500 italic mt-0.5">Duration: 24 Hours Unlimited Access</p>
+                </div>
+                <div className="bg-white p-2.5 rounded-lg border border-amber-200 text-center">
+                  <p className="text-[9px] text-amber-800 uppercase font-bold">Shradha Dakshina</p>
+                  {previouslyPaidPandit ? (
+                    <div>
+                      <span className="text-[10px] text-gray-400 line-through mr-1">₹251</span>
+                      <span className="text-sm font-extrabold text-saffron-700 font-display block">₹125</span>
+                      <span className="inline-block text-[8px] text-orange-600 font-bold bg-orange-50 px-1 rounded-sm mt-0.5">50% Renewal!</span>
+                    </div>
+                  ) : (
+                    <p className="text-lg font-extrabold text-saffron-700 font-display">₹251</p>
+                  )}
+                  <p className="text-[9.5px] text-green-600 font-medium">All taxes inclusive</p>
+                </div>
+              </div>
+
+              {/* Input fields */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-[10.5px] font-semibold text-gray-600">Devotee Host Name</label>
+                    <input 
+                      type="text" 
+                      required 
+                      value={consultFormName}
+                      onChange={(e) => setConsultFormName(e.target.value)}
+                      placeholder="Enter full name"
+                      className="w-full px-2.5 py-1.5 border border-gray-255 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 text-xs"
+                      id="consult-field-name"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-[10.5px] font-semibold text-gray-600">Primary Mobile (for voice callback)</label>
+                    <input 
+                      type="text" 
+                      required 
+                      value={consultFormPhone}
+                      onChange={(e) => setConsultFormPhone(e.target.value)}
+                      placeholder="eg. +91 98851 XXXXX"
+                      className="w-full px-2.5 py-1.5 border border-gray-255 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 text-xs"
+                      id="consult-field-phone"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10.5px] font-semibold text-gray-600">Vedic Gothra (Optional - for astral aligning)</label>
+                  <input 
+                    type="text"
+                    value={consultFormGothra}
+                    onChange={(e) => setConsultFormGothra(e.target.value)}
+                    placeholder="eg. Bhardwaj, Kashyap, Shandilya"
+                    className="w-full px-2.5 py-1.5 border border-gray-255 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 text-xs"
+                    id="consult-field-gothra"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[10.5px] font-semibold text-gray-600">Astrological Concern / Question (Optional)</label>
+                  <textarea 
+                    value={consultFormNotes}
+                    onChange={(e) => setConsultFormNotes(e.target.value)}
+                    placeholder="Describe your health, ancestral, corporate business, or matrimonial situations..."
+                    rows={2}
+                    className="w-full px-2.5 py-1.5 border border-gray-255 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 text-xs resize-none"
+                    id="consult-field-notes"
+                  />
+                </div>
+              </div>
+
+              {/* Secure Payment System Selector */}
+              <div className="space-y-2 border-t border-dashed border-gray-200 pt-3">
+                <label className="block text-[10.5px] font-bold text-gray-700">Select Cosmic Transaction Channel</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setConsultPayMethod('upi')}
+                    className={`p-2.5 rounded-xl border text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                      consultPayMethod === 'upi'
+                        ? 'border-saffron-500 bg-saffron-50/40 font-bold text-saffron-800'
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-500'
+                    }`}
+                  >
+                    <span className="text-sm font-display font-bold">📱 UPI Transfer</span>
+                    <span className="text-[9px] opacity-75">PayTM, GPay, PhonePe</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConsultPayMethod('card')}
+                    className={`p-2.5 rounded-xl border text-center transition flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                      consultPayMethod === 'card'
+                        ? 'border-saffron-500 bg-saffron-50/40 font-bold text-saffron-800'
+                        : 'border-gray-200 hover:bg-gray-50 text-gray-500'
+                    }`}
+                  >
+                    <span className="text-sm font-display font-bold">💳 Card Gateway</span>
+                    <span className="text-[9px] opacity-75">Secure Visa, MasterCard</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* UPI specific dynamic directions or checkout simulation */}
+              {consultPayMethod === 'upi' ? (
+                <div className="bg-gradient-to-b from-saffron-50/50 to-amber-50/50 p-3 rounded-xl border border-saffron-100 flex items-center gap-3 animate-fadeIn">
+                  <div className="bg-white p-1 rounded-lg border border-amber-200 shrink-0 select-none">
+                    <img 
+                      src={settings.upiQrUrl || "https://images.unsplash.com/photo-1601597111158-2fceff270190?auto=format&fit=crop&q=80&w=150"} 
+                      alt="Cosmic UPI QR"
+                      referrerPolicy="no-referrer"
+                      className="w-12 h-12 object-contain rounded-sm"
+                    />
+                  </div>
+                  <div>
+                    <span className="font-bold text-[10px] text-saffron-850 uppercase tracking-wide block">Integrated UPI QR Gateway</span>
+                    <p className="text-[10px] text-gray-500 mt-0.5">UPI ID: <span className="font-mono text-gray-750 font-semibold">{settings.upiId || 'pooja4pandit@upi'}</span></p>
+                    <p className="text-[9px] text-gray-400 italic">Secure merchant handshake simulated automatically on submit.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2 bg-gray-50/50 p-3 rounded-xl border border-gray-150 animate-fadeIn text-[10px]">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-gray-600 block uppercase">Visa Secure Checkout</span>
+                    <span className="text-[8px] bg-green-100 text-green-700 px-1 py-0.5 rounded-sm uppercase font-mono tracking-widest font-bold">PCI Compliant</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input 
+                      type="text" placeholder="Card Number" defaultValue="4111 2222 3333 4444" disabled
+                      className="col-span-3 px-2 py-1.5 border border-gray-200 rounded-md bg-white text-gray-400 font-mono text-[10px]"
+                    />
+                    <input 
+                      type="text" placeholder="MM/YY" defaultValue="12/28" disabled
+                      className="px-2 py-1.5 border border-gray-200 rounded-md bg-white text-gray-400 font-mono text-[10px]"
+                    />
+                    <input 
+                      type="password" placeholder="CVV" defaultValue="***" disabled
+                      className="px-2 py-1.5 border border-gray-200 rounded-md bg-white text-gray-400 font-mono text-[10px]"
+                    />
+                    <span className="text-[9px] text-gray-400 italic flex items-center justify-end pr-1 font-sans">Simulated Secure</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsConsultModalOpen(false)}
+                  className="px-4 py-2 bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 rounded-lg text-xs font-semibold cursor-pointer transition flex-1 text-center"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-gradient-to-r from-saffron-600 to-amber-500 hover:from-saffron-700 hover:to-amber-600 text-white font-bold px-6 py-2.5 rounded-lg text-xs transition duration-150 cursor-pointer shadow-md uppercase tracking-wider flex-2 animate-bounce"
+                  id="submit-consultation-btn"
+                >
+                  Confirm Dakshina & Bind Call (₹{previouslyPaidPandit ? 125 : 251})
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DEVOTEE TERMS OF USE */}
+      {isTermsModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn" id="terms-modal-container">
+          <div className="bg-white rounded-3xl w-full max-w-xl shadow-2xl p-6 border border-saffron-100 flex flex-col max-h-[85vh] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-saffron-100 pb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📜</span>
+                <h3 className="font-bold font-display text-lg text-saffron-950 uppercase tracking-wide">Devotee Terms & Conditions</h3>
+              </div>
+              <button 
+                onClick={() => setIsTermsModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 transition p-1 text-sm bg-gray-150 hover:bg-gray-250 rounded-full"
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="overflow-y-auto py-4 text-xs text-gray-700 space-y-3 leading-relaxed pr-2 font-sans">
+              <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100 text-[11px] text-amber-900 font-medium mb-2">
+                🕉️ These terms are dynamically configured by the Mathura-certified dynamic portal administration of {settings.panditName || 'Shyam Guru ji'}.
+              </div>
+              <p className="whitespace-pre-line font-sans text-xs text-gray-600 leading-relaxed">
+                {settings.devoteeTerms || `1. Sanctity of Sankalpa: By scheduling a dynamic Vedic ritual on the devotee online portal, you agree that your designated Gotra, birth constellation, name, and lineage declarations are recorded with absolute accuracy to guarantee perfect resonance of Sanskrit phonetic swara metrics.
+                
+                2. Live Stream Attendance: To receive standard high-degree energetic outcomes, registered devotees should log in at least 10 minutes prior to the sacred calculated Muhurat seconds to assure flawless video link handshakes.
+                 
+                3. Materials Preparedness: In standard custom configurations, devotees are responsible for unboxing standard cow ghee and gangajal raw material cargos dispatched to their domestic threshold 3 days prior.
+                
+                4. Conduct & Respect: Appropriate cleanliness, modest attire, and an atmosphere of silence and spiritual devotion must be maintained inside your domestic space throughout the E-Puja interactive chants.`}
+              </p>
+            </div>
+            
+            <div className="border-t border-saffron-100 pt-3 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsTermsModalOpen(false)}
+                className="bg-saffron-600 hover:bg-saffron-700 text-white font-bold px-5 py-2.5 rounded-xl text-xs uppercase tracking-wider transition duration-150 cursor-pointer shadow-md w-full"
+              >
+                Accept & Close Terms
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PERSISTENT FLOATING WHATSAPP ASSISTANCE ACCESSIBILITY BUTTON */}
+      {settings.whatsappNumber && (
+        <a
+          href={`https://wa.me/${(settings.whatsappNumber || '+91 98851 10082').replace(/[^0-9]/g, '')}`}
+          target="_blank"
+          rel="noreferrer"
+          referrerPolicy="no-referrer"
+          className="fixed bottom-6 left-6 z-40 bg-emerald-600 hover:bg-emerald-500 text-white p-3.5 rounded-full shadow-2xl flex items-center justify-center transition duration-200 hover:scale-105 active:scale-95 group border-2 border-white/20"
+          id="floating-whatsapp-widget"
+          title="Direct WhatsApp Guidance Support"
+        >
+          <span className="relative flex h-3 w-3 mr-1">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+          </span>
+          <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12.012 2c-5.518 0-9.99 4.493-9.99 10.011 0 1.905.534 3.689 1.458 5.215L2 22l5.006-1.312a9.92 9.92 0 0 0 5.006 1.323c5.524 0 10.007-4.498 10.007-10.011C22.02 6.493 17.536 2 12.012 2zm6.277 14.167c-.244.693-1.42 1.258-1.954 1.332-.533.074-1.071.139-3.238-.727a11.164 11.164 0 0 1-4.857-4.28 12.57 12.57 0 0 1-1.354-2.88c-.068-.382.261-.598.544-.614.195-.011.393.003.553.013.16.01.244.02.348.243.141.315.485 1.189.527 1.277.043.087.054.212.003.327-.052.115-.173.228-.277.348-.103.118-.217.204-.092.423.479.82 1.107 1.5 1.865 2.016.59.397 1.096.554 1.353.428.16-.08.318-.282.434-.447.168-.239.3-.185.505-.104.205.08 1.302.613 1.524.726.223.115.348.195.402.293.054.098.054.554-.19 1.247z" />
+          </svg>
+          <span className="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 ease-out whitespace-nowrap text-xs font-bold font-sans ml-2">
+            Pooja WhatsApp Guidance Support
+          </span>
+        </a>
       )}
 
     </div>

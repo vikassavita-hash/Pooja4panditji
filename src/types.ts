@@ -77,6 +77,18 @@ export interface PortalSettings {
   geminiApiKey: string;
   upiId: string;
   upiQrUrl: string; 
+  // Pandit profile details
+  panditName?: string;
+  panditCertification?: string;
+  panditBio?: string;
+  panditImage?: string;
+  // Tab visibility settings
+  showExplorePujasTab?: boolean;
+  showAiPanditTab?: boolean;
+  showMyBookingsTab?: boolean;
+  showAdminPortalTab?: boolean;
+  // Devotee Terms and Conditions
+  devoteeTerms?: string;
 }
 
 export interface UserAccount {
