@@ -1,0 +1,6 @@
+{
+  "name": "Pooja4Panditji",
+  "description": "An authentic spiritual booking platform for pujas, featuring live chatbot pandit guides, transparent scheduling, customized samagri details, and a secure payment gateway.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
