@@ -106,7 +106,7 @@ app.post("/api/chat", async (req, res) => {
     console.error("Gemini server-side broker failure:", error);
     
     // Graceful degradation when the API key is not present or is placeholder, matching security goals
-    let fallbackText = "Pranam. I am Pandit Shastri Dev. Seeking your spiritual peace. ";
+    let fallbackText = "Pranam. I am Shyam Guruji. Seeking your spiritual peace. ";
     
     if (error.message && error.message.includes("GEMINI_API_KEY")) {
       fallbackText += "The divine network requires setup. Please make sure to add your GEMINI_API_KEY in the Secrets panel of AI Studio so I can connect deep Vedic intelligence for you! Let me know if you would like me to discuss Sri Satyanarayan, Rudrabhishek or Griha Pravesh essentials anyway.";
