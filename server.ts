@@ -186,7 +186,7 @@ app.get("/api/users", (req, res) => {
       userId: 'vikas.savita@smollan.com',
       passwordHash: 'password123',
       fullName: 'Vikas Savita',
-      phone: '+91 98765 43210',
+      phone: '+91 93405 72788',
       email: 'vikas.savita@smollan.com',
       gothra: 'Bhardwaj',
       nakshatra: 'Rohini',
