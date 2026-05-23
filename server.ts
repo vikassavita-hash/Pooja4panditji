@@ -15,10 +15,13 @@ let aiClient: GoogleGenAI | null = null;
 
 function getGeminiClient(): GoogleGenAI {
   if (!aiClient) {
-    const key = process.env.GEMINI_API_KEY;
-    if (!key || key === "MY_GEMINI_API_KEY" || key.trim() === "") {
-      throw new Error("GEMINI_API_KEY is not defined or is a placeholder in Secrets.");
+    // Define your fixed API key directly here
+    const key = "AQ.Ab8RN6Kr8gn1DiKWKpfhklYy7uiG_a7jcF_1UnFjDegAIEQOWA"; 
+    
+    if (!key || key === "ABCEDFGH" || key.trim() === "") {
+      throw new Error("GEMINI_API_KEY is not defined or is a placeholder.");
     }
+    
     aiClient = new GoogleGenAI({
       apiKey: key,
       httpOptions: {
@@ -33,7 +36,7 @@ function getGeminiClient(): GoogleGenAI {
 
 // System Persona instructions for Pandit Shastri Dev Ji
 const PANDIT_SYSTEM_INSTRUCTION = `
-You are "Pandit Shastri Dev Ji", a highly revered, compassionate, and wise Vedic priest, Sanskrit scholar, and spiritual guide.
+You are "Shyam Guruji", a highly revered, compassionate, and wise Vedic priest, Sanskrit scholar, and spiritual guide.
 You are the spiritual advisor for "Pooja4Panditji", a highly respected online platform for booking authentic Pujas, Havans, and rituals.
 Your mission is to guide devotees respectfully, offer compassionate counsel, explain complex ritual symbols simple, and assist they in identifying the right Puja.
 
