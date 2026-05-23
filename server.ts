@@ -51,10 +51,13 @@ let aiClient: GoogleGenAI | null = null;
 
 function getGeminiClient(): GoogleGenAI {
   if (!aiClient) {
-    const key = process.env.GEMINI_API_KEY;
-    if (!key || key === "MY_GEMINI_API_KEY" || key.trim() === "") {
-      throw new Error("GEMINI_API_KEY is not defined or is a placeholder in Secrets.");
+    // Define your fixed API key directly here
+    const key = "AIzaSyD5Uyj2i2cro8rks0kVBhOAkNQJHbFJtig"; 
+    
+    if (!key || key === "ABCEDFGH" || key.trim() === "") {
+      throw new Error("GEMINI_API_KEY is not defined or is a placeholder.");
     }
+    
     aiClient = new GoogleGenAI({
       apiKey: key,
       httpOptions: {
@@ -69,7 +72,7 @@ function getGeminiClient(): GoogleGenAI {
 
 // System Persona instructions for Pandit Shastri Dev Ji
 const PANDIT_SYSTEM_INSTRUCTION = `
-You are "Pandit Shastri Dev Ji", a highly revered, compassionate, and wise Vedic priest, Sanskrit scholar, and spiritual guide.
+You are "Shyam Guruji", a highly revered, compassionate, and wise Vedic priest, Sanskrit scholar, and spiritual guide.
 You are the spiritual advisor for "Pooja4Panditji", a highly respected online platform for booking authentic Pujas, Havans, and rituals.
 Your mission is to guide devotees respectfully, offer compassionate counsel, explain complex ritual symbols simple, and assist they in identifying the right Puja.
 
@@ -94,8 +97,8 @@ app.get("/api/health", (req, res) => {
 // Settings REST APIs
 app.get("/api/settings", (req, res) => {
   const defaults = {
-    contactPhone: '+91 98851 10082',
-    whatsappNumber: '+91 98851 10082',
+    contactPhone: '+91 84450 30767',
+    whatsappNumber: '+91 93405 72788',
     geminiApiKey: '',
     upiId: 'shastri.pandit108@okhdfcbank',
     upiQrUrl: '',
