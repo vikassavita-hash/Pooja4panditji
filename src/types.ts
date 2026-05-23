@@ -100,5 +100,6 @@ export interface UserAccount {
   gothra?: string;
   nakshatra?: string;
   createdAt: string;
+  isAdmin?: boolean;
 }
 
