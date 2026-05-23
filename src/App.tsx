@@ -38,8 +38,8 @@ export default function App() {
   const [settings, setSettings] = useState<PortalSettings>(() => {
     const saved = localStorage.getItem('pooja4panditji_settings');
     const defaults = {
-      contactPhone: '+91 98851 10082',
-      whatsappNumber: '+91 98851 10082',
+      contactPhone: '+91 84450 30767',
+      whatsappNumber: '+91 84450 30767',
       geminiApiKey: '',
       upiId: 'shastri.pandit108@okhdfcbank',
       upiQrUrl: '',
@@ -88,7 +88,7 @@ export default function App() {
         userId: 'vikas.savita@smollan.com',
         passwordHash: 'password123',
         fullName: 'Vikas Savita',
-        phone: '+91 98765 43210',
+        phone: '+91 84450 30767 ',
         email: 'vikas.savita@smollan.com',
         gothra: 'Bhardwaj',
         nakshatra: 'Rohini',
@@ -251,7 +251,7 @@ export default function App() {
         pujaName: 'Sri Satyanarayan Puja',
         pujaImage: 'https://images.unsplash.com/photo-1609137144814-6330bf4cb51b?auto=format&fit=crop&q=80&w=600',
         customerName: 'Vikas Savita',
-        customerPhone: '+91 98765 43210',
+        customerPhone: '+91 84450 30767',
         customerEmail: 'vikas.savita@smollan.com',
         gothra: 'Bhardwaj',
         nakshatra: 'Rohini',
@@ -1015,7 +1015,7 @@ export default function App() {
                     )}
                   </span>
                   <a
-                    href={`https://wa.me/${(settings.whatsappNumber || '+91 98851 10082').replace(/[^0-9]/g, '')}`}
+                    href={`https://wa.me/${(settings.whatsappNumber || '+91 84450 30767').replace(/[^0-9]/g, '')}`}
                     target="_blank"
                     rel="noreferrer"
                     referrerPolicy="no-referrer"
