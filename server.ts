@@ -6,6 +6,7 @@ import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import mysql from "mysql2/promise";
 import { PUJAS_DATA } from "./src/data/pujas";
+import nodemailer from 'nodemailer';
 
 dotenv.config();
 
@@ -225,6 +226,57 @@ app.post("/api/bookings", async (req, res) => {
     return res.status(400).json({ error: "Bookings must be an array." });
   }
   await writeDbFile("bookings.json", newBookings);
+
+  // Send confirmation emails if SMTP is configured
+  try {
+    const smtpHost = process.env.SMTP_HOST;
+    if (smtpHost) {
+      const port = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587;
+      const secure = port === 465;
+      const authUser = process.env.SMTP_USER;
+      const authPass = process.env.SMTP_PASS;
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port,
+        secure,
+        auth: authUser && authPass ? { user: authUser, pass: authPass } : undefined,
+      });
+
+      for (const b of newBookings) {
+        try {
+          if (!b || !b.customerEmail) continue;
+          const from = process.env.FROM_EMAIL || authUser || 'no-reply@pooja4panditji.com';
+          const subject = `Booking Confirmation - ${b.pujaName || 'Puja'}`;
+          const textLines = [
+            `Om Namah Shivaya`,
+            `\nPranam ${b.customerName || 'devotee'},`,
+            `\nYour booking has been received and confirmed. Details below:\n`,
+            `Booking ID: ${b.id || 'N/A'}`,
+            `Puja: ${b.pujaName || 'N/A'}`,
+            `Date & Time: ${b.dateTime || 'N/A'}`,
+            `Package: ${b.packageName || 'N/A'}`,
+            `Price: ${b.price != null ? b.price : 'N/A'}`,
+            `Mode: ${b.mode || 'N/A'}`,
+            `\nIf you have any questions, reply to this email or contact us at ${process.env.CONTACT_EMAIL || process.env.FROM_EMAIL || 'support@pooja4panditji.com'}`,
+            `\n
+Warm regards,\nPooja4Panditji Team`
+          ];
+
+          await transporter.sendMail({
+            from,
+            to: b.customerEmail,
+            subject,
+            text: textLines.join('\n'),
+          });
+        } catch (err) {
+          console.error('Failed to send booking confirmation email for', b && b.customerEmail, err);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error while attempting to send confirmation emails:', err);
+  }
+
   res.json({ success: true, bookings: newBookings });
 });
 
