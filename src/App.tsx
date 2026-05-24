@@ -34,8 +34,9 @@ export default function App() {
   const [settings, setSettings] = useState<PortalSettings>(() => {
     const saved = localStorage.getItem('pooja4panditji_settings');
     const defaults = {
-      contactPhone: '+91 98851 10082',
-      whatsappNumber: '+91 98851 10082',
+      contactPhone: '+91 84450 30767',
+      whatsappNumber: '+91 84450 30767',
+      contactEmail: 'vsvikash290@gmail.com',
       geminiApiKey: '',
       upiId: 'shastri.pandit108@okhdfcbank',
       upiQrUrl: '',
