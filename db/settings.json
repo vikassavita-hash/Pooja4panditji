@@ -1,7 +1,6 @@
 {
-  "contactPhone": "+91 84450 30767",
-  "whatsappNumber": "+91 84450 30767",
-  "contactEmail": "vsvikash290@gmail.com",
+  "contactPhone": "+91 98851 10082",
+  "whatsappNumber": "+91 98851 10082",
   "geminiApiKey": "",
   "upiId": "shastri.pandit108@okhdfcbank",
   "upiQrUrl": "",
@@ -12,5 +11,6 @@
   "showAiPanditTab": true,
   "showMyBookingsTab": true,
   "showAdminPortalTab": true,
-  "devoteeTerms": "1. All devotion services (Shradha Dakshina) are verified secure.\n2. The simulated handshakes are for instructional, direct, offline and virtual connect.\n3. By booking any puja, the devotee agrees to provide accurate Birth coordinates, Gothra and Nakshatra.\n4. Standard 24 Hours validity applies to digital chatbot and voice consult channels.\n5. Vedic rituals represent deep lineage devotion."
+  "devoteeTerms": "1. All devotion services (Shradha Dakshina) are verified secure.\n2. The simulated handshakes are for instructional, direct, offline and virtual connect.\n3. By booking any puja, the devotee agrees to provide accurate Birth coordinates, Gothra and Nakshatra.\n4. Standard 24 Hours validity applies to digital chatbot and voice consult channels.\n5. Vedic rituals represent deep lineage devotion.",
+  "contactEmail": "vsvikash290@gmail.com"
 }
