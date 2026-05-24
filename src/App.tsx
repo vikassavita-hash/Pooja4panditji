@@ -4,6 +4,7 @@ import PujaCard from './components/PujaCard';
 import { PUJAS_DATA } from './data/pujas';
 import { Puja, Booking, ChatMessage, PujaPackage, PortalSettings, UserAccount } from './types';
 import AdminPortal from './components/AdminPortal';
+import { getSettings, saveSettings, getPujas, savePujas, getUsers, saveUsers, getBookings, saveBookings } from './backend';
 import { 
   Sparkles, ShieldCheck, CreditCard, Clock, MapPin, Globe, CheckCircle2, 
   Calendar, Check, User, Phone, Mail, Award, ArrowRight, MessageSquare, 
@@ -27,19 +28,14 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('pooja4panditji_pujas_catalog', JSON.stringify(pujas));
-    // Persist to backend database
-    fetch('/api/pujas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(pujas)
-    }).catch(err => console.error("Could not sync pujas to backend:", err));
+    savePujas(pujas).catch(err => console.error("Could not sync pujas to backend:", err));
   }, [pujas]);
 
   const [settings, setSettings] = useState<PortalSettings>(() => {
     const saved = localStorage.getItem('pooja4panditji_settings');
     const defaults = {
-      contactPhone: '+91 84450 30767',
-      whatsappNumber: '+91 84450 30767',
+      contactPhone: '+91 98851 10082',
+      whatsappNumber: '+91 98851 10082',
       geminiApiKey: '',
       upiId: 'shastri.pandit108@okhdfcbank',
       upiQrUrl: '',
@@ -65,12 +61,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('pooja4panditji_settings', JSON.stringify(settings));
-    // Persist to backend database
-    fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings)
-    }).catch(err => console.error("Could not sync settings to backend:", err));
+    saveSettings(settings).catch(err => console.error("Could not sync settings to backend:", err));
   }, [settings]);
 
   // Devotee state structures
@@ -88,7 +79,7 @@ export default function App() {
         userId: 'vikas.savita@smollan.com',
         passwordHash: 'password123',
         fullName: 'Vikas Savita',
-        phone: '+91 84450 30767 ',
+        phone: '+91 98765 43210',
         email: 'vikas.savita@smollan.com',
         gothra: 'Bhardwaj',
         nakshatra: 'Rohini',
@@ -99,12 +90,7 @@ export default function App() {
 
   useEffect(() => {
     localStorage.setItem('pooja4panditji_users', JSON.stringify(users));
-    // Persist to backend database
-    fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(users)
-    }).catch(err => console.error("Could not sync users to backend:", err));
+    saveUsers(users).catch(err => console.error("Could not sync users to backend:", err));
   }, [users]);
 
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
@@ -131,40 +117,24 @@ export default function App() {
   useEffect(() => {
     async function syncBackendData() {
       try {
-        // 1. Sync Settings
-        const settingsRes = await fetch('/api/settings');
-        if (settingsRes.ok) {
-          const settingsData = await settingsRes.json();
-          if (settingsData && settingsData.contactPhone) {
-            setSettings(settingsData);
-          }
+        const settingsData = await getSettings();
+        if (settingsData && (settingsData as any).contactPhone) {
+          setSettings(settingsData as PortalSettings);
         }
 
-        // 2. Sync Catalog
-        const pujasRes = await fetch('/api/pujas');
-        if (pujasRes.ok) {
-          const pujasList = await pujasRes.json();
-          if (Array.isArray(pujasList) && pujasList.length > 0) {
-            setPujas(pujasList);
-          }
+        const pujasList = await getPujas();
+        if (Array.isArray(pujasList) && pujasList.length > 0) {
+          setPujas(pujasList as Puja[]);
         }
 
-        // 3. Sync Users
-        const usersRes = await fetch('/api/users');
-        if (usersRes.ok) {
-          const usersList = await usersRes.json();
-          if (Array.isArray(usersList) && usersList.length > 0) {
-            setUsers(usersList);
-          }
+        const usersList = await getUsers();
+        if (Array.isArray(usersList) && usersList.length > 0) {
+          setUsers(usersList as UserAccount[]);
         }
 
-        // 4. Sync Bookings
-        const bookingsRes = await fetch('/api/bookings');
-        if (bookingsRes.ok) {
-          const bookingsList = await bookingsRes.json();
-          if (Array.isArray(bookingsList)) {
-            setBookings(bookingsList);
-          }
+        const bookingsList = await getBookings();
+        if (Array.isArray(bookingsList)) {
+          setBookings(bookingsList as Booking[]);
         }
       } catch (error) {
         console.error("Initial backend synchronization pause (server offline or compiling):", error);
@@ -251,7 +221,7 @@ export default function App() {
         pujaName: 'Sri Satyanarayan Puja',
         pujaImage: 'https://images.unsplash.com/photo-1609137144814-6330bf4cb51b?auto=format&fit=crop&q=80&w=600',
         customerName: 'Vikas Savita',
-        customerPhone: '+91 84450 30767',
+        customerPhone: '+91 98765 43210',
         customerEmail: 'vikas.savita@smollan.com',
         gothra: 'Bhardwaj',
         nakshatra: 'Rohini',
@@ -277,12 +247,7 @@ export default function App() {
   // Save bookings to localStorage
   useEffect(() => {
     localStorage.setItem('pooja4panditji_bookings', JSON.stringify(bookings));
-    // Persist to backend database
-    fetch('/api/bookings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(bookings)
-    }).catch(err => console.error("Could not sync bookings to backend:", err));
+    saveBookings(bookings).catch(err => console.error("Could not sync bookings to backend:", err));
   }, [bookings]);
 
   // Booking process states
@@ -1015,7 +980,7 @@ export default function App() {
                     )}
                   </span>
                   <a
-                    href={`https://wa.me/${(settings.whatsappNumber || '+91 84450 30767').replace(/[^0-9]/g, '')}`}
+                    href={`https://wa.me/${(settings.whatsappNumber || '+91 98851 10082').replace(/[^0-9]/g, '')}`}
                     target="_blank"
                     rel="noreferrer"
                     referrerPolicy="no-referrer"

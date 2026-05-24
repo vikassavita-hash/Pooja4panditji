@@ -1,0 +1,611 @@
+[
+  {
+    "id": "satyanarayan",
+    "name": "Sri Satyanarayan Puja",
+    "sanskritName": "श्री सत्यनारायण व्रत कथा",
+    "tagline": "Attract immense peace, health, and financial security to your household.",
+    "deity": "Lord Vishnu (Satyanarayan)",
+    "category": "prosperity",
+    "description": "The Satyanarayan Puja is performed to seek the blessings of Lord Vishnu, the preserver of the universe. It is traditionally performed on full moon days (Purnima) or on major milestones to express gratitude, clear obstacles, and manifest abundance and harmony inside the home.",
+    "significance": "The Puja represents the devotion to Truth (Satya). Reciting and listening to the Satyanarayan Katha cleanses absolute home energies, instills positivity, and ensures well-being for family members.",
+    "rating": 4.9,
+    "reviewCount": 384,
+    "durationString": "2 - 2.5 Hours",
+    "basePrice": 2100,
+    "imageUrl": "https://images.unsplash.com/photo-1609137144814-6330bf4cb51b?auto=format&fit=crop&q=80&w=600",
+    "mantra": "ॐ नमो भगवते वासुदेवाय",
+    "mantraMeaning": "\"Om Namo Bhagavate Vasudevay\" - Salutations to the Lord of the Universe, who dwells in the hearts of all.",
+    "packages": [
+      {
+        "id": "basic",
+        "name": "Katha & Sankalp (E-Puja)",
+        "price": 2100,
+        "description": "Perfect for remote devotees. Conducted interactively over live HD video stream with personalized Sankalp.",
+        "benefits": [
+          "Live interactive Zoom/Meet with Pandit Ji",
+          "Sankalp taken with your Family Gothra & Names",
+          "Detailed explanation of Satyanarayan Katha",
+          "Digital Mantra booklet and Arti recording"
+        ],
+        "durationMinutes": 90,
+        "includedSamagri": false,
+        "dakshinaInclusions": [
+          "Pandit Ji Dakshina",
+          "E-Certification & Blessings"
+        ]
+      },
+      {
+        "id": "standard",
+        "name": "Ghar Sanskar (In-Person Puja)",
+        "price": 5100,
+        "description": "Complete offline Satyanarayan Puja performed in-person by an experienced Pandit Ji at your residence.",
+        "benefits": [
+          "One expert Pandit Ji visiting your home",
+          "Mandala creation, Panchamrit Abhishek, and full Katha paths",
+          "Custom holy thread tying protection ceremony",
+          "We send a compact premium Samagri kit"
+        ],
+        "durationMinutes": 120,
+        "includedSamagri": true,
+        "dakshinaInclusions": [
+          "Pandit ji travel charges",
+          "Vedic rituals dakshina",
+          "Puja materials included"
+        ]
+      },
+      {
+        "id": "premium",
+        "name": "Maha Kalyan (Grand Puja & Havan)",
+        "price": 11000,
+        "description": "An auspicious grand scale puja including Lord Vishnu Havan (fire ritual) for high-vibrational energetic purification.",
+        "benefits": [
+          "Senior Acharya Pandit + 1 Assistant Pandit",
+          "Full Satyanarayan Puja + Purusha Sukta homam / fire ritual",
+          "Authentic handpicked gangajal, extensive flower decoration arrangement support",
+          "Premium brass dia set and holy brass materials provided"
+        ],
+        "durationMinutes": 150,
+        "includedSamagri": true,
+        "dakshinaInclusions": [
+          "Two Pandits dakshina",
+          "Travel and complete grand samagri setup",
+          "Prasad distribution items assistance"
+        ]
+      }
+    ],
+    "samagriList": [
+      {
+        "name": "Shri Satyanarayan Photo / Idol",
+        "quantity": "1 Unit",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Haldi (Turmeric) & Kumkum Powder",
+        "quantity": "50g each",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Sandalwood Paste (Chandan)",
+        "quantity": "1 Box",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Ganga Jal & Panchamrit (Milk, Curd, Ghee, Honey, Sugar)",
+        "quantity": "1 Bottle + Fresh mix",
+        "isMandatory": true,
+        "category": "fresh"
+      },
+      {
+        "name": "Mauli (Sacred Red Thread) & Kalash",
+        "quantity": "1 Roll + 1 Copper pot",
+        "isMandatory": true,
+        "category": "sacred"
+      },
+      {
+        "name": "Desi Ghee & Cotton Wicks (for Diya)",
+        "quantity": "250g + 1 pack",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Fresh Fruits & Sweet Prasad (Sheera/Suji Halwa)",
+        "quantity": "5 types + Home cooked",
+        "isMandatory": true,
+        "category": "fresh"
+      },
+      {
+        "name": "Tulsi Leaves & Betel Leaves with Nuts",
+        "quantity": "21 leaves + 11 sets",
+        "isMandatory": true,
+        "category": "fresh"
+      },
+      {
+        "name": "Incense Sticks (Agarbatti) & Camphor (Kapur)",
+        "quantity": "1 pack + 1 box",
+        "isMandatory": true,
+        "category": "offering"
+      }
+    ]
+  },
+  {
+    "id": "grihapravesh",
+    "name": "Griha Pravesh Puja (Housewarming)",
+    "sanskritName": "गृह प्रवेश पूजा एवं वास्तु शांति",
+    "tagline": "Cleanse and bless your new home with prosperity, positive energy, and happiness.",
+    "deity": "Lord Ganesha & Vastu Purusha",
+    "category": "milestones",
+    "description": "Before stepping into a newly constructed or freshly rented house, it is vital to perform Vastu Shanti and Griha Pravesh Pujas. This ritual pacifies malefic cosmic coordinates, wards off evil presences, and charges the entire domestic space with vibrant welfare energy.",
+    "significance": "Ensures the protection of residents against structural or karmic flaws (Vastu Dosha) and establishes a blissful gateway for prosperity, warmth, and safe living.",
+    "rating": 4.95,
+    "reviewCount": 512,
+    "durationString": "3 - 4 Hours",
+    "basePrice": 4500,
+    "imageUrl": "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?auto=format&fit=crop&q=80&w=600",
+    "mantra": "ॐ वास्तुपुरुषाय नमः",
+    "mantraMeaning": "\"Om Vastu Purushaya Namah\" - Salutations to the Divine Spirit dwelling in this structure, protect our household.",
+    "packages": [
+      {
+        "id": "basic",
+        "name": "Vastu Sankalp & Dwar Puja (E-Mode)",
+        "price": 3500,
+        "description": "Guided main door dwar puja, kitchen stove invocation and simple cow urine sprinkle purification over video stream.",
+        "benefits": [
+          "Full online Sanskrit mantra recitation support",
+          "Sankalp, Vastu Shanti prayers, and main entrance door activation",
+          "Step-by-step guidance for milk boiling ceremony",
+          "Digital certificate of Vastu blessings"
+        ],
+        "durationMinutes": 120,
+        "includedSamagri": false,
+        "dakshinaInclusions": [
+          "Pandit Ji E-dakshina",
+          "PDF instruction roadmap"
+        ]
+      },
+      {
+        "id": "standard",
+        "name": "Vastu Shanti & Dwar Puja (Home)",
+        "price": 7500,
+        "description": "The standard authentic ritual including Ganesh puja, Dwar Puja, boiling milk ceremony, and sacred water sprinkling.",
+        "benefits": [
+          "Certified veteran Pandit Ji visiting your new home",
+          "Vastu Purusha installation and Navagraha invocation",
+          "Full kitchen, room-by-room purification layout",
+          "Full Home Samagri material cargo delivered to your doorstep"
+        ],
+        "durationMinutes": 180,
+        "includedSamagri": true,
+        "dakshinaInclusions": [
+          "Travel costs included",
+          "Pandit Ji Dakshina",
+          "Complete Vastu Puja materials"
+        ]
+      },
+      {
+        "id": "premium",
+        "name": "Maha Vastu Peace & Havan",
+        "price": 15500,
+        "description": "Elite Griha Pravesh containing detailed Vastu Yagna (Havan), Navagraha Homa, and Ganapati Havan for strong health.",
+        "benefits": [
+          "Two senior Pandits with absolute shloka proficiency",
+          "Vastu Mandala Havan + Panchbhoot purification setup",
+          "Gau Puja guidance (cow-feeding coordination if available)",
+          "Extensive premium dry fruits offering, camphor havan samagri kit"
+        ],
+        "durationMinutes": 240,
+        "includedSamagri": true,
+        "dakshinaInclusions": [
+          "Dakshina for both Senior Pandits",
+          "Vastu Yajna wood, herbs, and pristine ghee provided"
+        ]
+      }
+    ],
+    "samagriList": [
+      {
+        "name": "Vastu Yantra and Brass Idol of Ganesha",
+        "quantity": "1 Set",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Bricks & Sand (for custom temporary Havan Kund)",
+        "quantity": "1 Set (Supplied on request)",
+        "isMandatory": false,
+        "category": "essential"
+      },
+      {
+        "name": "Dry coconuts, mango leaves, and darbha grass",
+        "quantity": "5 units + 1 pack",
+        "isMandatory": true,
+        "category": "sacred"
+      },
+      {
+        "name": "Panchadhatu (Five Metals coin mix)",
+        "quantity": "1 pack",
+        "isMandatory": true,
+        "category": "sacred"
+      },
+      {
+        "name": "Havan Samagri wood mix (Mango wood & herbs)",
+        "quantity": "2 kg",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Panchamrit & Fresh Milk for boiling",
+        "quantity": "To be kept ready on site",
+        "isMandatory": true,
+        "category": "fresh"
+      },
+      {
+        "name": "Toran (Mango leaves & Marigold Flowers garland)",
+        "quantity": "2 sets for main gates",
+        "isMandatory": true,
+        "category": "fresh"
+      },
+      {
+        "name": "Yellow Mustard seeds (Peele Sarso) & Loban",
+        "quantity": "100g each",
+        "isMandatory": true,
+        "category": "sacred"
+      }
+    ]
+  },
+  {
+    "id": "rudrabhishek",
+    "name": "Maha Rudrabhishek Puja",
+    "sanskritName": "रुद्राभिषेक पूजा एवं शिव स्तुति",
+    "tagline": "Wash away past karmas, neutralize planetary doshas, and embrace Lord Shiva’s grace.",
+    "deity": "Lord Shiva (Rudra)",
+    "category": "peace",
+    "description": "Rudrabhishek is one of the most powerful Vedic rituals to appease Lord Shiva in his fiery form (Rudra). It involves pouring selected pure substances (liquid stream) like cow milk, sugarcane juice, honey, curd, and coconut water over the Shiva Lingam while chanting the powerful Sri Rudram.",
+    "significance": "Cleanses spiritual pathways, overcomes chronic health struggles, dispels enemies, resolves negative planetary transitions (Sani / Rahu), and restores absolute peace of mind.",
+    "rating": 4.88,
+    "reviewCount": 295,
+    "durationString": "2 Hours",
+    "basePrice": 3100,
+    "imageUrl": "https://images.unsplash.com/photo-1599819811279-d5ad9cccf838?auto=format&fit=crop&q=80&w=600",
+    "mantra": "ॐ नमः शिवाय",
+    "mantraMeaning": "\"Om Namah Shivaya\" - Adorations to the Auspicious and Destroyer of all dualities.",
+    "packages": [
+      {
+        "id": "basic",
+        "name": "E-Abhishek & Shiv Sankalp",
+        "price": 2500,
+        "description": "Interactive online Rudram chanting, Sankalp, and live Abhishek guidance with your physical household lingam.",
+        "benefits": [
+          "Webcam face-to-face video Rudrabhiskek coordination",
+          "Personalized Gothra Sankalp recitation",
+          "Vedic explanation of the 11 Shiva attributes",
+          "Digital download links of Rudrashtakam & Mantras"
+        ],
+        "durationMinutes": 75,
+        "includedSamagri": false,
+        "dakshinaInclusions": [
+          "Online Shastri Dakshina"
+        ]
+      },
+      {
+        "id": "standard",
+        "name": "Panchamrit Abhishek (Home / Temple)",
+        "price": 5500,
+        "description": "A complete dynamic Rudrabhishek performed at your local temple on your behalf or in your home sanctuary.",
+        "benefits": [
+          "Professional Pandit Ji with flawless Rudram recitation capability",
+          "Complete 5-liquid (Panchamrit) pouring rituals",
+          "Bael leaves and white flowers offerings arrangement",
+          "We supply premium Rudraksha neck bead as blessing gift"
+        ],
+        "durationMinutes": 110,
+        "includedSamagri": true,
+        "dakshinaInclusions": [
+          "Pandit ji Dakshina & Travel",
+          "Panchabhishek ingredients package"
+        ]
+      },
+      {
+        "id": "premium",
+        "name": "Ekadasa Rudrabhishek (Grand Temple Ritual)",
+        "price": 12500,
+        "description": "Veda-Patha performance chanting Rudram eleven times with elaborate substances. Attracts severe celestial power.",
+        "benefits": [
+          "Maha-Acharya and assisting priests",
+          "Water, sugarcane juice, honey, tender coconut water, milk, and rose water abhishek",
+          "Pradosha-Kaal priority check & Maha Shivaratri priority",
+          "Large natural sphatik/stone Shivling provided securely for temporary puja if requested"
+        ],
+        "durationMinutes": 180,
+        "includedSamagri": true,
+        "dakshinaInclusions": [
+          "Sanskrit scholars fee",
+          "All pure premium abhishek liquids and fresh items"
+        ]
+      }
+    ],
+    "samagriList": [
+      {
+        "name": "Shiv Lingam (brass, stone or mercurial)",
+        "quantity": "1 Unit",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Fresh Milk, Curd, Sugarcane Juice, Honey, Rose Water",
+        "quantity": "1 Litre / Pack each",
+        "isMandatory": true,
+        "category": "fresh"
+      },
+      {
+        "name": "Bael Leaves (Belpatra) & Datura flowers",
+        "quantity": "21 leaves + and flowers",
+        "isMandatory": true,
+        "category": "fresh"
+      },
+      {
+        "name": "Sandalwood Paste & Sacred Ash (Vibhuti)",
+        "quantity": "50g each",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Panchapatra copper cup & spoon spoon set",
+        "quantity": "1 Set",
+        "isMandatory": true,
+        "category": "sacred"
+      },
+      {
+        "name": "Rudraksha Mala (108 Beads)",
+        "quantity": "1 Strung Bead Set",
+        "isMandatory": false,
+        "category": "sacred"
+      },
+      {
+        "name": "Whole Coconut & Betel nuts",
+        "quantity": "1 unit + 10 nuts",
+        "isMandatory": true,
+        "category": "essential"
+      }
+    ]
+  },
+  {
+    "id": "lakshmi",
+    "name": "Ganesh-Lakshmi Business Puja",
+    "sanskritName": "लक्ष्मी-गणेश पूजन एवं श्री सूक्त यज्ञ",
+    "tagline": "Bless your starting venture, warehouse, or home office with fortune and clear blockages.",
+    "deity": "Goddess Lakshmi & Lord Ganesh",
+    "category": "prosperity",
+    "description": "A special puja designed to invite the goddess of wealth (Lakshmi) and the lord of Intellect and obstacle-removal (Ganesha) into your workspace, showroom, store, or office. Excellent for Diwali, New Ventures, or when starting a financial fiscal cycle.",
+    "significance": "Eradicates business inertia, attracts deep customer footprints, brings financial wisdom to avoid debt, and encourages structural business growth.",
+    "rating": 4.92,
+    "reviewCount": 420,
+    "durationString": "2 Hours",
+    "basePrice": 2800,
+    "imageUrl": "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=600",
+    "mantra": "ॐ श्रीं ह्रीं क्लीं कमलवासिन्यै स्वाहा",
+    "mantraMeaning": "\"Om Shreem Hreem Kleem Kamalavasinyai Swaha\" - Sacred mantra invoking Goddess Lakshmi residing on the lotus of pure consciousness.",
+    "packages": [
+      {
+        "id": "basic",
+        "name": "Vyaapaar Shubh Aarambh (E-Puja)",
+        "price": 2800,
+        "description": "Online office launch or accounting books blessing via remote video streaming. Perfect for digital-first companies.",
+        "benefits": [
+          "Authentic Ganesh and Lakshmi mantra chantings",
+          "Digital accounts ledger block prayer",
+          "Custom Gothra Sankalp recitation during trading times",
+          "E-Certificate with Prasad dispatched via mail (local limits)"
+        ],
+        "durationMinutes": 70,
+        "includedSamagri": false,
+        "dakshinaInclusions": [
+          "Digital Pandit booking fee"
+        ]
+      },
+      {
+        "id": "standard",
+        "name": "Shubh Labh Office Puja (In-Person)",
+        "price": 6100,
+        "description": "Physical puja performed directly at your commercial workplace, factory, shop floor, or home flat.",
+        "benefits": [
+          "Certified pandit ji with special business blessing experience",
+          "Vahikhata (accounts ledger) and main vault puja",
+          "Door swastika drawing and mango leaf tying",
+          "Medium-size copper yantra customized for cash drawers"
+        ],
+        "durationMinutes": 110,
+        "includedSamagri": true,
+        "dakshinaInclusions": [
+          "Pandit travel within state territory",
+          "Ledger Puja assets, full red clothes and grains"
+        ]
+      },
+      {
+        "id": "premium",
+        "name": "Maha Shreem Kuber Yagna",
+        "price": 13500,
+        "description": "A grand Vedic event combining Puja with Kuber chanting, Shri Suktam homa, and heavy floral sanctuary design.",
+        "benefits": [
+          "2 senior Pandits for synchronized Chanting & Havan",
+          "Shree Yantra activation ceremony (Copper yantra included for your keeps)",
+          "Dry fruit offerings and 108 coins Lotus puja (kamal gatta seeds ritual)",
+          "Auspicious premium silver coin as prasad blessing"
+        ],
+        "durationMinutes": 150,
+        "includedSamagri": true,
+        "dakshinaInclusions": [
+          "Ultimate Vedic Pandits Dakshina",
+          "Lotus seed string bundle, Havan Kund setting and pristine materials"
+        ]
+      }
+    ],
+    "samagriList": [
+      {
+        "name": "Copper Shree Yantra (Energetically charged)",
+        "quantity": "1 Unit",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Pure Laxmi-Ganesha Brass/Silver Idol set",
+        "quantity": "1 Set",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Lotus Flowers (Kamal ka phool) & Roses",
+        "quantity": "5 units + Assorted fresh garlands",
+        "isMandatory": true,
+        "category": "fresh"
+      },
+      {
+        "name": "Kamal Gatta Seeds (Lotus Seeds for Havan)",
+        "quantity": "108 seeds",
+        "isMandatory": true,
+        "category": "sacred"
+      },
+      {
+        "name": "Dry fruits (Cashew, Almond, Pistachio, Raisins)",
+        "quantity": "250g mix pack",
+        "isMandatory": true,
+        "category": "offering"
+      },
+      {
+        "name": "Auspicious Red Cloth",
+        "quantity": "1.25 meters",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Cardamom (Elaichi), Clove (Laung), and Saffron (Kesar)",
+        "quantity": "1 pack each",
+        "isMandatory": true,
+        "category": "sacred"
+      },
+      {
+        "name": "Panch Dhaan (Five Auspicious Harvest Grains)",
+        "quantity": "500g mix",
+        "isMandatory": true,
+        "category": "essential"
+      }
+    ]
+  },
+  {
+    "id": "mahamrityunjaya",
+    "name": "Maha Mrityunjaya Healing Jaap",
+    "sanskritName": "महामृत्युंजय जाप एवं आरोग्य रक्षा",
+    "tagline": "Restore health longevity, eradicate heavy illnesses, and invoke divine healing shields.",
+    "deity": "Maha Mrityunjaya Lord Shiva",
+    "category": "remedial",
+    "description": "This powerful healing jaap invokes Lord Shivas immortal energy to safeguard health. Highly recommended for family members going through intense surgeries, chronic ailments, acute mental depressants, or dealing with birth-chart hazards.",
+    "significance": "Protects against premature mishaps and fatal health crashes. Promotes continuous bio-energetic repair, emotional balance, and physical resilience.",
+    "rating": 4.97,
+    "reviewCount": 618,
+    "durationString": "3 - 5 Hours (Dynamic)",
+    "basePrice": 5100,
+    "imageUrl": "https://images.unsplash.com/photo-1608958416715-db809f6eeb6f?auto=format&fit=crop&q=80&w=600",
+    "mantra": "ॐ त्र्यम्बकं यजामहे सुगन्धिं पुष्टिवर्धनम्। उर्वारुकमिव बन्धनान्मृत्योर्मुक्षीय माऽमृतात्॥",
+    "mantraMeaning": "\"Om Tryambakam Yajamahe...\" - We worship the Three-Eyed One, fragrant and nurturing all. May He liberate us from death and disease, even as a cucumber is severed from its vine.",
+    "packages": [
+      {
+        "id": "basic",
+        "name": "Maha Mrityunjaya Sankalp & 1100 Chants",
+        "price": 5100,
+        "description": "Online direct invocation. An authenticated Pandit Ji counts 1,100 mrityunjaya chants taking your specific sick relative name sankalp offline or via videoconference.",
+        "benefits": [
+          "High quality personalized live Sankalp over webcam",
+          "Vedic counting bead (rudraksha) recitation sequence",
+          "Individual target names and gothra inclusion",
+          "Digital dispatch of physical holy thread and vibhuti ash"
+        ],
+        "durationMinutes": 120,
+        "includedSamagri": false,
+        "dakshinaInclusions": [
+          "Pandit Ji chanting allowance",
+          "Veda blessing certificate"
+        ]
+      },
+      {
+        "id": "standard",
+        "name": "Healing Arogya Jaap & 5100 Chants",
+        "price": 9500,
+        "description": "Complete offline residential puja. Pandit Ji visits home, conducts Lord Shiva Abhishekam, sings kirtan, and completes 5,100 chants live.",
+        "benefits": [
+          "Expert Pandit Ji holding specialized Ayurvedic and Vedic training",
+          "Pristine herbal samagri kit featuring custom restorative herbs (Guggal, Dashmool, Giloy)",
+          "Aura cleansing around the patient bedroom",
+          "100% pure gangajal water sprinkling ceremony"
+        ],
+        "durationMinutes": 240,
+        "includedSamagri": true,
+        "dakshinaInclusions": [
+          "Pandit Ji Dakshina, Travel and specialized healing incense and herbs package"
+        ]
+      },
+      {
+        "id": "premium",
+        "name": "Maha Mrityunjaya Anushthan (11000 Chants & Maha Yajna)",
+        "price": 18500,
+        "description": "The supreme remedial shield. 3 Vedic priests perform continuous 11,000 chants live with a dense therapeutic Havan, completely neutralizing bad planetary effects.",
+        "benefits": [
+          "3 senior Sanskrit scholars chanting in highly resonant sync",
+          "Complete Mrityunjaya Havan + Lord Shiva Abhishek",
+          "Ghee Havan Kund, Durva Grass and customized sacred items",
+          "Auspicious energized 5-mukhi Rudraksha bracelet provided for the patient’s recovery"
+        ],
+        "durationMinutes": 300,
+        "includedSamagri": true,
+        "dakshinaInclusions": [
+          "Scholar fees for three priests",
+          "Travel, grand havan kund equipment setup, premium medicinal herbs and wood"
+        ]
+      }
+    ],
+    "samagriList": [
+      {
+        "name": "Shivling / Shiva Photo (Maha Mrityunjaya variant)",
+        "quantity": "1 Unit",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Arogya Herbs (Giloy, Guggal, Jatamansi, Loban, Sandal)",
+        "quantity": "500g assorted mix",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Black Sesame Seeds (Kala Til) & Barley (Jau)",
+        "quantity": "250g each",
+        "isMandatory": true,
+        "category": "sacred"
+      },
+      {
+        "name": "Darbha Sacred Grass & Durva leaves (for health)",
+        "quantity": "1 bundle",
+        "isMandatory": true,
+        "category": "sacred"
+      },
+      {
+        "name": "Pure Cow Ghee",
+        "quantity": "1 kg",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Copper Abhishek Lota (Kalash) & plate",
+        "quantity": "1 set",
+        "isMandatory": true,
+        "category": "essential"
+      },
+      {
+        "name": "Fresh Bel fruit and pomegranate offerings",
+        "quantity": "5 pieces",
+        "isMandatory": true,
+        "category": "fresh"
+      }
+    ]
+  }
+]

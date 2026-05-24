@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Puja, Booking, PujaPackage, PortalSettings, UserAccount } from '../types';
+import { getPujas, savePujas, saveSettings, saveBookings } from '../backend';
 import { 
   Lock, ShieldCheck, Eye, Edit2, Check, RefreshCw, LogOut, 
   Image, CheckCircle, Calendar, FileText, Sparkles, Sliders,
@@ -201,13 +202,15 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
   };
 
   const handleStatusChange = (bkgId: string, nextStatus: Booking['status']) => {
-    setBookings(prev => prev.map(bk => {
+    const updatedBookings = bookings.map(bk => {
       if (bk.id === bkgId) {
         return { ...bk, status: nextStatus };
       }
       return bk;
-    }));
-    // If the selected modal is active, update its reference as well
+    });
+    setBookings(updatedBookings);
+    saveBookings(updatedBookings).catch(err => console.error('Failed to persist booking status change to backend:', err));
+
     if (selectedBkgForView?.id === bkgId) {
       setSelectedBkgForView(prev => prev ? { ...prev, status: nextStatus } : null);
     }
@@ -290,9 +293,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
 
     const updated = [...pujas, newPujaItem];
     setPujas(updated);
-    
-    // Save to local storage for persistence
-    localStorage.setItem('pooja4pandit_local_pujas', JSON.stringify(updated));
+    savePujas(updated).catch(err => console.error('Failed to save new puja catalog to backend:', err));
 
     // Reset fields
     setNewPujaName('');
@@ -315,7 +316,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
     if (confirm(`Are you absolutely sure you want to delete the sacred listing "${pujaToDelete.name}"? This action is permanent.`)) {
       const updated = pujas.filter(p => p.id !== pujaId);
       setPujas(updated);
-      localStorage.setItem('pooja4pandit_local_pujas', JSON.stringify(updated));
+      savePujas(updated).catch(err => console.error('Failed to persist catalog deletion to backend:', err));
       setSelectedPujaToEdit(null);
       setSaveSuccessMsg(`Removed "${pujaToDelete.name}" from active listings.`);
       setTimeout(() => setSaveSuccessMsg(''), 5000);
@@ -341,8 +342,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
       showAdminPortalTab: localShowAdminPortalTab
     };
     setSettings(updatedSettings);
-    // Write back to localstorage immediately
-    localStorage.setItem('pooja4panditji_portal_settings', JSON.stringify(updatedSettings));
+    saveSettings(updatedSettings).catch(err => console.error('Failed to persist portal settings to backend:', err));
     setSettingsSuccessMsg('ॐ Shanti! Global support helpline, WhatsApp details, Pandit certified profile, and tab configurations updated successfully.');
     setTimeout(() => setSettingsSuccessMsg(''), 5000);
   };
@@ -373,7 +373,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
     });
 
     setPujas(updatedPujas);
-    localStorage.setItem('pooja4pandit_local_pujas', JSON.stringify(updatedPujas));
+    savePujas(updatedPujas).catch(err => console.error('Failed to save catalog edits to backend:', err));
 
     setSaveSuccessMsg('Aum! Sacred prices and photo coordinates updated successfully across all servers.');
     setTimeout(() => setSaveSuccessMsg(''), 4000);

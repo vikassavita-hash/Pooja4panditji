@@ -1,0 +1,28 @@
+[
+  {
+    "id": "BKG-9843-VEDA",
+    "pujaId": "satyanarayan",
+    "pujaName": "Sri Satyanarayan Puja",
+    "pujaImage": "https://images.unsplash.com/photo-1609137144814-6330bf4cb51b?auto=format&fit=crop&q=80&w=600",
+    "customerName": "Vikas Savita",
+    "customerPhone": "+91 98765 43210",
+    "customerEmail": "vikas.savita@smollan.com",
+    "gothra": "Bhardwaj",
+    "nakshatra": "Rohini",
+    "sankalpNames": "Vikas Savita & Family",
+    "mode": "e-puja",
+    "dateTime": "2026-06-15T09:30",
+    "language": "Sanskrit & Hindi",
+    "packageId": "basic",
+    "packageName": "Katha & Sankalp (E-Puja)",
+    "price": 2100,
+    "includeSamagriKit": false,
+    "status": "confirmed",
+    "paymentId": "PAY-STN-89473-OK",
+    "paymentMethod": "UPI (GPay)",
+    "meetingLink": "https://meet.google.com/ais-veda-satya",
+    "transactionDateTime": "2026-05-22T12:00:00Z",
+    "otpVerified": true,
+    "notes": "Please pray for my mother's speedy recovery."
+  }
+]
