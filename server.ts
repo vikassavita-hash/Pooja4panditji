@@ -4,6 +4,7 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import mysql from "mysql2/promise";
 import { PUJAS_DATA } from "./src/data/pujas";
 
 dotenv.config();
@@ -12,14 +13,65 @@ const app = express();
 app.use(express.json());
 const PORT = 3000;
 
-// Setup persistent JSON file-based database
-const DB_DIR = path.join(process.cwd(), "db");
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
+const MYSQL_ENABLED = !!process.env.MYSQL_HOST && !!process.env.MYSQL_USER && !!process.env.MYSQL_DATABASE;
+let mysqlPool: mysql.Pool | null = null;
+
+async function initMySqlPool() {
+  if (!MYSQL_ENABLED) {
+    return;
+  }
+
+  if (mysqlPool) {
+    return;
+  }
+
+  mysqlPool = await mysql.createPool({
+    host: process.env.MYSQL_HOST,
+    port: process.env.MYSQL_PORT ? parseInt(process.env.MYSQL_PORT, 10) : 3306,
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_PASSWORD,
+    database: process.env.MYSQL_DATABASE,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+  });
+
+  await mysqlPool.query(`
+    CREATE TABLE IF NOT EXISTS json_store (
+      collection VARCHAR(100) PRIMARY KEY,
+      data LONGTEXT NOT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
 }
 
-function readDbFile(filename: string, defaultValue: any) {
-  const filePath = path.join(DB_DIR, filename);
+function getTableName(filename: string) {
+  return path.basename(filename, path.extname(filename));
+}
+
+async function readDbFile(filename: string, defaultValue: any) {
+  if (MYSQL_ENABLED) {
+    try {
+      await initMySqlPool();
+      const tableName = getTableName(filename);
+      const [rows] = await mysqlPool!.query<any[]>(
+        `SELECT data FROM json_store WHERE collection = ? LIMIT 1`,
+        [tableName]
+      );
+      if (rows.length > 0 && rows[0].data) {
+        return JSON.parse(rows[0].data);
+      }
+      await mysqlPool!.query(
+        `INSERT INTO json_store (collection, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)`,
+        [tableName, JSON.stringify(defaultValue)]
+      );
+      return defaultValue;
+    } catch (err) {
+      console.error(`MySQL read fallback error for ${filename}:`, err);
+    }
+  }
+
+  const filePath = path.join(process.cwd(), "db", filename);
   if (!fs.existsSync(filePath)) {
     try {
       fs.writeFileSync(filePath, JSON.stringify(defaultValue, null, 2), "utf8");
@@ -37,8 +89,22 @@ function readDbFile(filename: string, defaultValue: any) {
   }
 }
 
-function writeDbFile(filename: string, data: any) {
-  const filePath = path.join(DB_DIR, filename);
+async function writeDbFile(filename: string, data: any) {
+  if (MYSQL_ENABLED) {
+    try {
+      await initMySqlPool();
+      const tableName = getTableName(filename);
+      await mysqlPool!.query(
+        `INSERT INTO json_store (collection, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)`,
+        [tableName, JSON.stringify(data)]
+      );
+      return;
+    } catch (err) {
+      console.error(`MySQL write fallback error for ${filename}:`, err);
+    }
+  }
+
+  const filePath = path.join(process.cwd(), "db", filename);
   try {
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
   } catch (err) {
@@ -46,18 +112,20 @@ function writeDbFile(filename: string, data: any) {
   }
 }
 
+const DB_DIR = path.join(process.cwd(), "db");
+if (!fs.existsSync(DB_DIR)) {
+  fs.mkdirSync(DB_DIR, { recursive: true });
+}
+
 // Safe Lazy Initialization for Google GenAI on the secure server side
 let aiClient: GoogleGenAI | null = null;
 
 function getGeminiClient(): GoogleGenAI {
   if (!aiClient) {
-    // Define your fixed API key directly here
-    const key = "AIzaSyD5Uyj2i2cro8rks0kVBhOAkNQJHbFJtig"; 
-    
-    if (!key || key === "ABCEDFGH" || key.trim() === "") {
-      throw new Error("GEMINI_API_KEY is not defined or is a placeholder.");
+    const key = process.env.GEMINI_API_KEY;
+    if (!key || key === "MY_GEMINI_API_KEY" || key.trim() === "") {
+      throw new Error("GEMINI_API_KEY is not defined or is a placeholder in Secrets.");
     }
-    
     aiClient = new GoogleGenAI({
       apiKey: key,
       httpOptions: {
@@ -72,7 +140,7 @@ function getGeminiClient(): GoogleGenAI {
 
 // System Persona instructions for Pandit Shastri Dev Ji
 const PANDIT_SYSTEM_INSTRUCTION = `
-You are "Shyam Guruji", a highly revered, compassionate, and wise Vedic priest, Sanskrit scholar, and spiritual guide.
+You are "Pandit Shastri Dev Ji", a highly revered, compassionate, and wise Vedic priest, Sanskrit scholar, and spiritual guide.
 You are the spiritual advisor for "Pooja4Panditji", a highly respected online platform for booking authentic Pujas, Havans, and rituals.
 Your mission is to guide devotees respectfully, offer compassionate counsel, explain complex ritual symbols simple, and assist they in identifying the right Puja.
 
@@ -95,10 +163,10 @@ app.get("/api/health", (req, res) => {
 });
 
 // Settings REST APIs
-app.get("/api/settings", (req, res) => {
+app.get("/api/settings", async (req, res) => {
   const defaults = {
-    contactPhone: '+91 84450 30767',
-    whatsappNumber: '+91 93405 72788',
+    contactPhone: '+91 98851 10082',
+    whatsappNumber: '+91 98851 10082',
     geminiApiKey: '',
     upiId: 'shastri.pandit108@okhdfcbank',
     upiQrUrl: '',
@@ -111,33 +179,33 @@ app.get("/api/settings", (req, res) => {
     showAdminPortalTab: true,
     devoteeTerms: '1. All devotion services (Shradha Dakshina) are verified secure.\n2. The simulated handshakes are for instructional, direct, offline and virtual connect.\n3. By booking any puja, the devotee agrees to provide accurate Birth coordinates, Gothra and Nakshatra.\n4. Standard 24 Hours validity applies to digital chatbot and voice consult channels.\n5. Vedic rituals represent deep lineage devotion.'
   };
-  const settings = readDbFile("settings.json", defaults);
+  const settings = await readDbFile("settings.json", defaults);
   res.json(settings);
 });
 
-app.post("/api/settings", (req, res) => {
+app.post("/api/settings", async (req, res) => {
   const newSettings = req.body;
-  writeDbFile("settings.json", newSettings);
+  await writeDbFile("settings.json", newSettings);
   res.json({ success: true, settings: newSettings });
 });
 
 // Catalog Pujas REST APIs
-app.get("/api/pujas", (req, res) => {
-  const pujas = readDbFile("pujas.json", PUJAS_DATA);
+app.get("/api/pujas", async (req, res) => {
+  const pujas = await readDbFile("pujas.json", PUJAS_DATA);
   res.json(pujas);
 });
 
-app.post("/api/pujas", (req, res) => {
+app.post("/api/pujas", async (req, res) => {
   const newPujas = req.body;
   if (!Array.isArray(newPujas)) {
     return res.status(400).json({ error: "Catalog must be an array." });
   }
-  writeDbFile("pujas.json", newPujas);
+  await writeDbFile("pujas.json", newPujas);
   res.json({ success: true, pujas: newPujas });
 });
 
 // Bookings REST APIs
-app.get("/api/bookings", (req, res) => {
+app.get("/api/bookings", async (req, res) => {
   const defaults = [
     {
       id: 'BKG-9843-VEDA',
@@ -166,43 +234,43 @@ app.get("/api/bookings", (req, res) => {
       notes: "Please pray for my mother's speedy recovery."
     }
   ];
-  const bookings = readDbFile("bookings.json", defaults);
+  const bookings = await readDbFile("bookings.json", defaults);
   res.json(bookings);
 });
 
-app.post("/api/bookings", (req, res) => {
+app.post("/api/bookings", async (req, res) => {
   const newBookings = req.body;
   if (!Array.isArray(newBookings)) {
     return res.status(400).json({ error: "Bookings must be an array." });
   }
-  writeDbFile("bookings.json", newBookings);
+  await writeDbFile("bookings.json", newBookings);
   res.json({ success: true, bookings: newBookings });
 });
 
 // Users REST APIs
-app.get("/api/users", (req, res) => {
+app.get("/api/users", async (req, res) => {
   const defaults = [
     {
       userId: 'vikas.savita@smollan.com',
       passwordHash: 'password123',
       fullName: 'Vikas Savita',
-      phone: '+91 93405 72788',
+      phone: '+91 98765 43210',
       email: 'vikas.savita@smollan.com',
       gothra: 'Bhardwaj',
       nakshatra: 'Rohini',
       createdAt: '2026-05-18T10:00:00Z'
     }
   ];
-  const users = readDbFile("users.json", defaults);
+  const users = await readDbFile("users.json", defaults);
   res.json(users);
 });
 
-app.post("/api/users", (req, res) => {
+app.post("/api/users", async (req, res) => {
   const newUsers = req.body;
   if (!Array.isArray(newUsers)) {
     return res.status(400).json({ error: "Users list must be an array." });
   }
-  writeDbFile("users.json", newUsers);
+  await writeDbFile("users.json", newUsers);
   res.json({ success: true, users: newUsers });
 });
 
