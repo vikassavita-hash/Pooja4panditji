@@ -28,68 +28,57 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 app.use("/uploads", express.static(UPLOADS_DIR));
 
-const MYSQL_DATABASE_URL = process.env.DATABASE_URL || process.env.MYSQL_DATABASE_URL || process.env.CLEARDB_DATABASE_URL || process.env.JAWSDB_URL || "";
-const MYSQL_CONFIG = MYSQL_DATABASE_URL
-  ? parseDatabaseUrl(MYSQL_DATABASE_URL)
-  : {
-      host: process.env.MYSQL_HOST || process.env.DB_HOST || process.env.MYSQLHOST || process.env.DB_HOSTNAME || "localhost",
-      user: process.env.MYSQL_USER || process.env.DB_USER || process.env.MYSQLUSER || process.env.DB_USERNAME || "",
-      password: process.env.MYSQL_PASSWORD || process.env.DB_PASSWORD || process.env.MYSQLPASS || process.env.DB_USER_PASSWORD || "",
-      database: process.env.MYSQL_DATABASE || process.env.DB_NAME || process.env.MYSQLDB || process.env.DB_DATABASE || "",
-      port: parseInt(process.env.MYSQL_PORT || process.env.DB_PORT || process.env.MYSQLPORT || "3306", 10),
-      ssl:
-        process.env.MYSQL_SSL === "true" || process.env.MYSQL_SSL === "1"
-          ? { rejectUnauthorized: false }
-          : undefined
+// Parse Connection string intelligently prioritizing Public TCP proxy handles if running outside cluster
+const RAW_URL = process.env.MYSQL_PUBLIC_URL || process.env.MYSQL_URL || process.env.DATABASE_URL || "";
+
+function parseDatabaseUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return {
+      host: parsed.hostname,
+      port: parseInt(parsed.port || "3306", 10),
+      user: decodeURIComponent(parsed.username),
+      password: decodeURIComponent(parsed.password),
+      database: parsed.pathname?.slice(1) || "railway",
+      ssl: { rejectUnauthorized: false } // Required for external proxies
     };
-
-// FIXED CONFIG CONDITION: Ensure the pool initializes even if password configuration is empty string
-const MYSQL_POOL: Pool | null = (MYSQL_CONFIG.host && MYSQL_CONFIG.database)
-  ? createPool({
-      host: MYSQL_CONFIG.host,
-      user: MYSQL_CONFIG.user,
-      password: MYSQL_CONFIG.password,
-      database: MYSQL_CONFIG.database,
-      port: MYSQL_CONFIG.port,
-      ssl: MYSQL_CONFIG.ssl,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      decimalNumbers: true,
-      enableKeepAlive: true // Keeps idle connections warm on Railway networks
-    })
-  : null;
-
-if (!MYSQL_POOL) {
-  console.warn("[MySQL] No database pool created. Check your DATABASE_URL environment variables.");
-} else {
-  console.log(`[MySQL] Configured pool for ${MYSQL_CONFIG.user}@${MYSQL_CONFIG.host}:${MYSQL_CONFIG.port}/${MYSQL_CONFIG.database} ssl=${!!MYSQL_CONFIG.ssl}`);
+  } catch (e) {
+    // Graceful fallback to individual env parameters
+    return {
+      host: process.env.MYSQLHOST || "localhost",
+      port: parseInt(process.env.MYSQLPORT || "3306", 10),
+      user: process.env.MYSQLUSER || "root",
+      password: process.env.MYSQLPASSWORD || "",
+      database: process.env.MYSQLDATABASE || "railway",
+      ssl: process.env.MYSQLHOST && process.env.MYSQLHOST !== "localhost" ? { rejectUnauthorized: false } : undefined
+    };
+  }
 }
+
+const MYSQL_CONFIG = parseDatabaseUrl(RAW_URL);
+
+// Build the engine pool with explicit MySQL 8 auth and keep-alive configuration flags
+const MYSQL_POOL: Pool | null = createPool({
+  host: MYSQL_CONFIG.host,
+  user: MYSQL_CONFIG.user,
+  password: MYSQL_CONFIG.password,
+  database: MYSQL_CONFIG.database,
+  port: MYSQL_CONFIG.port,
+  ssl: MYSQL_CONFIG.ssl,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  decimalNumbers: true,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
+  connectTimeout: 30000,
+  allowPublicKeyRetrieval: true // Essential fix for Railway MySQL 8 environments
+});
 
 let mysqlReady = false;
 
-function parseDatabaseUrl(url: string) {
-  const parsed = new URL(url);
-  const sslMode = parsed.searchParams.get("ssl") || parsed.searchParams.get("sslmode") || parsed.searchParams.get("tls");
-  
-  // Railway strictly requires SSL connections. Enforce initialization options.
-  const isRailway = parsed.hostname.includes("railway");
-  const sslEnabled = sslMode === "true" || sslMode === "require" || sslMode === "verify_ca" || sslMode === "verify_identity" || parsed.protocol === "mysqls:" || isRailway;
-
-  return {
-    host: parsed.hostname,
-    port: parseInt(parsed.port || "3306", 10),
-    user: decodeURIComponent(parsed.username),
-    password: decodeURIComponent(parsed.password),
-    database: parsed.pathname?.slice(1) || "",
-    ssl: sslEnabled ? { rejectUnauthorized: false } : undefined
-  };
-}
-
 async function ensureMysqlConnected() {
-  if (!MYSQL_POOL) {
-    return false;
-  }
+  if (!MYSQL_POOL) return false;
   try {
     const conn = await MYSQL_POOL.getConnection();
     try {
@@ -97,7 +86,7 @@ async function ensureMysqlConnected() {
       if (!mysqlReady) {
         await ensureMysqlTables(conn);
         mysqlReady = true;
-        console.log("[MySQL] Connected to Railway MySQL successfully.");
+        console.log(`[MySQL] Connected successfully to target host: ${MYSQL_CONFIG.host}`);
       }
       return true;
     } finally {
@@ -105,7 +94,7 @@ async function ensureMysqlConnected() {
     }
   } catch (err) {
     mysqlReady = false;
-    console.error("[MySQL] Connection dropped or failed, falling back to local JSON files:", err);
+    console.error("[MySQL] Connection dropped or failed, using local file-system fallbacks:", err);
     return false;
   }
 }
@@ -166,7 +155,6 @@ async function mysqlGetSettings(defaults: any) {
     await MYSQL_POOL!.execute(`INSERT INTO settings (id, value) VALUES (1, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)`, [JSON.stringify(defaults)]);
     return defaults;
   } catch (err) {
-    console.error("[MySQL] Failed to fetch settings, using local fallback:", err);
     return readDbFile("settings.json", defaults);
   }
 }
@@ -180,7 +168,7 @@ async function mysqlSaveSettings(settings: any) {
       [JSON.stringify(settings)]
     );
   } catch (err) {
-    console.error("[MySQL] Failed to save settings directly to database:", err);
+    console.error("[MySQL] Failed to save settings payload:", err);
   }
 }
 
@@ -195,13 +183,12 @@ async function mysqlGetCollection(table: string, filename: string, defaults: any
     }
     return result;
   } catch (err) {
-    console.error(`[MySQL] Failed to read collection ${table}, defaulting to fallback file:`, err);
     return readDbFile(filename, defaults);
   }
 }
 
 async function mysqlSaveCollection(table: string, filename: string, items: any[], idField: string) {
-  // Sync fallback local cache first
+  // Local redundancy file writes execute immediately
   writeDbFile(filename, items);
 
   if (!(await ensureMysqlConnected())) return;
@@ -210,7 +197,6 @@ async function mysqlSaveCollection(table: string, filename: string, items: any[]
   try {
     await conn.beginTransaction();
     
-    // Fixed Upsert execution strategy to properly map variables into SQL expressions
     if (items.length > 0) {
       for (const item of items) {
         const id = item[idField] || item.id || `GEN-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -224,7 +210,7 @@ async function mysqlSaveCollection(table: string, filename: string, items: any[]
     await conn.commit();
   } catch (err) {
     await conn.rollback();
-    console.error(`[MySQL] Transaction failed to persist array down to ${table}:`, err);
+    console.error(`[MySQL] Data sync runtime failure on table ${table}:`, err);
   } finally {
     conn.release();
   }
@@ -249,7 +235,6 @@ async function mysqlAppendEmailLogs(logs: any[]) {
     await conn.commit();
   } catch (err) {
     await conn.rollback();
-    console.error("[MySQL] Failed to append email logs to cluster database:", err);
   } finally {
     conn.release();
   }
@@ -261,7 +246,6 @@ async function mysqlGetEmailLogs(defaults: any[]) {
     const [rows]: any = await MYSQL_POOL!.query(`SELECT data FROM email_logs ORDER BY createdAt DESC`);
     return (rows as any[]).map((row) => safeParseJson(row.data));
   } catch (err) {
-    console.error("[MySQL] Error loading logs from database:", err);
     return readDbFile("email_logs.json", defaults);
   }
 }
@@ -271,16 +255,13 @@ function readDbFile(filename: string, defaultValue: any) {
   if (!fs.existsSync(filePath)) {
     try {
       fs.writeFileSync(filePath, JSON.stringify(defaultValue, null, 2), "utf8");
-    } catch (writeErr) {
-      console.error(`Error initial writing of ${filename}:`, writeErr);
-    }
+    } catch { /* suppress */ }
     return defaultValue;
   }
   try {
     const data = fs.readFileSync(filePath, "utf8");
     return JSON.parse(data);
   } catch (err) {
-    console.error(`Error reading database file ${filename}, fallback value used:`, err);
     return defaultValue;
   }
 }
@@ -290,11 +271,10 @@ function writeDbFile(filename: string, data: any) {
   try {
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
   } catch (err) {
-    console.error(`Error persisting database file ${filename}:`, err);
+    console.error(`Error writing database file ${filename}:`, err);
   }
 }
 
-// NodeMailer Divine Email Notification Engine
 function getEmailTransporter(settings: any) {
   const customGmail = settings?.gmailAddress;
   const customPass = settings?.googleAppPassword;
@@ -302,10 +282,7 @@ function getEmailTransporter(settings: any) {
   if (customGmail && customPass) {
     return nodemailer.createTransport({
       service: 'gmail',
-      auth: {
-        user: customGmail,
-        pass: customPass
-      }
+      auth: { user: customGmail, pass: customPass }
     });
   }
 
@@ -326,10 +303,7 @@ function getEmailTransporter(settings: any) {
   return {
     sendMail: async (mailOptions: any) => {
       console.log("================= SIMULATED OUTGOING EMAIL DISPATCH ================= ");
-      console.log(`FROM: ${mailOptions.from}`);
       console.log(`TO: ${mailOptions.to}`);
-      console.log(`SUBJECT: ${mailOptions.subject}`);
-      console.log(`HTML BODY LENGTH: ${mailOptions.html?.length || 0} characters`);
       console.log("=================================================================== ");
       return { messageId: `SIM-MSG-${Date.now()}` };
     }
@@ -337,113 +311,61 @@ function getEmailTransporter(settings: any) {
 }
 
 async function sendBookingConfirmationEmails(booking: any) {
-  const defaults = {
-    contactPhone: '+91 84450 30767',
-    whatsappNumber: '+91 84450 30767',
-    geminiApiKey: '',
-    upiId: 'shastri.pandit108@okhdfcbank',
-    upiQrUrl: '',
-    panditName: 'Shyam Guru ji',
-    panditCertification: 'Certified by Mathura Vedic Board',
-    panditBio: 'Renowned scholar of Astro-Vedic rituals.',
-    gmailAddress: 'vsvikash290@gmail.com',
-    googleAppPassword: ''
-  };
-  
+  const defaults = { gmailAddress: 'vsvikash290@gmail.com', googleAppPassword: '' };
   const settings = await mysqlGetSettings(defaults);
   const senderEmail = settings.gmailAddress || 'shri.panditji.vedas@gmail.com';
 
   try {
     const tx = getEmailTransporter(settings);
     
-    // 1. Admin Email
     const adminMailOptions = {
       from: `"Pooja4Panditji Divine Portal" <${senderEmail}>`,
       to: 'vsvikash290@gmail.com',
       subject: `🕉️ [Admin Alert] Divine Puja Booked! ID: ${booking.id} - ${booking.customerName}`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ffedd5; border-radius: 12px; background-color: #fffaf0;">
-          <h2 style="color: #ea580c; text-align: center; border-bottom: 2px solid #ffedd5; padding-bottom: 10px;">Divine Yajna Booking - Admin Console</h2>
-          <div style="background-color: #ffffff; padding: 15px; border-radius: 8px; border-left: 4px solid #ea580c; margin: 15px 0;">
-            <p style="margin: 4px 0; font-size: 13.5px;"><strong>Booking ID:</strong> ${booking.id}</p>
-            <p style="margin: 4px 0; font-size: 13.5px;"><strong>Auspicious Service:</strong> ${booking.pujaName}</p>
-            <p style="margin: 4px 0; font-size: 13.5px;"><strong>Package Chosen:</strong> ${booking.packageName || 'Standard'} (₹${booking.price})</p>
-            <p style="margin: 4px 0; font-size: 13.5px;"><strong>Auspicious Date/Time:</strong> ${new Date(booking.dateTime).toLocaleString()}</p>
-          </div>
-          <table style="width: 100%; font-size: 13px; text-align: left; border-collapse: collapse; margin-top: 5px;">
-            <tr><th style="padding: 6px; border-bottom: 1px solid #f1f5f9;">Devotee Name</th><td style="padding: 6px; border-bottom: 1px solid #f1f5f9;">${booking.customerName}</td></tr>
-            <tr><th style="padding: 6px; border-bottom: 1px solid #f1f5f9;">Primary Email</th><td style="padding: 6px; border-bottom: 1px solid #f1f5f9;">${booking.customerEmail}</td></tr>
-            <tr><th style="padding: 6px; border-bottom: 1px solid #f1f5f9;">Gotra</th><td style="padding: 6px; border-bottom: 1px solid #f1f5f9;">${booking.gothra || 'Kashyap'}</td></tr>
-            <tr><th style="padding: 6px; border-bottom: 1px solid #f1f5f9;">Nakshatra</th><td style="padding: 6px; border-bottom: 1px solid #f1f5f9;">${booking.nakshatra || 'Anuradha'}</td></tr>
-          </table>
-        </div>
-      `
+      html: `<div style="font-family: sans-serif; max-width: 600px; padding: 20px; background-color: #fffaf0;">
+              <h2>Divine Yajna Booking - Admin Console</h2>
+              <p><strong>Booking ID:</strong> ${booking.id}</p>
+              <p><strong>Auspicious Service:</strong> ${booking.pujaName}</p>
+              <p><strong>Devotee Name:</strong> ${booking.customerName}</p>
+             </div>`
     };
 
-    // 2. Devotee Receipt Email
     const devoteeMailOptions = {
       from: `"Pooja4Panditji Divine Dispatch" <${senderEmail}>`,
       to: booking.customerEmail,
       subject: `🕉️ Your Holy Booking is Confirmed! Service: ${booking.pujaName} 🕉️`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; border: 2px solid #ea580c; border-radius: 16px; background-color: #fffcf8;">
-          <div style="text-align: center; margin-bottom: 20px;">
-            <span style="font-size: 40px;">🕉️</span>
-            <h1 style="color: #c2410c; margin: 4px 0 2px 0;">Hari Om, Devotee</h1>
-          </div>
-          <p style="font-size: 14.5px; color: #4338ca; line-height: 1.6; text-align: center;">
-            Pranam <strong>${booking.customerName}</strong>! Your booking for the holy <strong>${booking.pujaName}</strong> is verified.
-          </p>
-          <div style="background-color: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #ffedd5; margin: 20px 0;">
-            <p style="margin: 6px 0; font-size: 14px;"><strong>Token ID:</strong> ${booking.id}</p>
-            <p style="margin: 6px 0; font-size: 14px;"><strong>Price Dakshina:</strong> ₹${booking.price}</p>
-            <p style="margin: 6px 0; font-size: 14px;"><strong>Muhurat Time:</strong> ${new Date(booking.dateTime).toLocaleString()}</p>
-          </div>
-        </div>
-      `
+      html: `<div style="font-family: sans-serif; max-width: 600px; padding: 25px; background-color: #fffcf8;">
+              <h1>Hari Om, Devotee</h1>
+              <p>Pranam <strong>${booking.customerName}</strong>! Your booking for <strong>${booking.pujaName}</strong> is locked.</p>
+             </div>`
     };
 
     const adminRes = await tx.sendMail(adminMailOptions);
     const devoteeRes = await tx.sendMail(devoteeMailOptions);
 
-    const logsToAdd = [
+    await mysqlAppendEmailLogs([
       {
-        id: `EMAIL-ADM-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        id: `EMAIL-ADM-${Date.now()}`,
         timestamp: new Date().toISOString(),
         from: adminMailOptions.from,
         to: adminMailOptions.to,
         subject: adminMailOptions.subject,
-        html: adminMailOptions.html,
-        status: adminRes?.messageId ? `Sent via SMTP (id: ${adminRes.messageId})` : "Simulated"
+        status: adminRes?.messageId ? `Sent` : "Simulated"
       },
       {
-        id: `EMAIL-DEV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        id: `EMAIL-DEV-${Date.now()}`,
         timestamp: new Date().toISOString(),
         from: devoteeMailOptions.from,
         to: devoteeMailOptions.to,
         subject: devoteeMailOptions.subject,
-        html: devoteeMailOptions.html,
-        status: devoteeRes?.messageId ? `Sent via SMTP (id: ${devoteeRes.messageId})` : "Simulated"
+        status: devoteeRes?.messageId ? `Sent` : "Simulated"
       }
-    ];
-
-    await mysqlAppendEmailLogs(logsToAdd);
+    ]);
   } catch (err: any) {
     console.error("[Email Engine] Failed to dispatch booking emails:", err);
-    const errorLog = {
-      id: `EMAIL-ERR-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      from: senderEmail,
-      to: `${booking.customerEmail} & vsvikash290@gmail.com`,
-      subject: `⚠️ FAILURE: ${booking.pujaName} Email Transmission`,
-      html: `<div>Error: ${err.message || err}</div>`,
-      status: `Failed`
-    };
-    await mysqlAppendEmailLogs([errorLog]);
   }
 }
 
-// Lazy Initialization for Google GenAI
 let aiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI {
   if (!aiClient) {
@@ -459,7 +381,7 @@ function getGeminiClient(): GoogleGenAI {
   return aiClient;
 }
 
-// API Routes
+// REST APIs
 app.get("/api/health", async (req, res) => {
   const dbAvailable = await ensureMysqlConnected();
   res.json({ status: "healthy", timestamp: new Date().toISOString(), mysql: dbAvailable ? "connected" : "unavailable" });
@@ -470,13 +392,7 @@ app.get("/api/db-status", async (req, res) => {
   res.json({
     mysqlPool: !!MYSQL_POOL,
     mysqlReady: dbAvailable,
-    config: {
-      host: MYSQL_CONFIG.host,
-      port: MYSQL_CONFIG.port,
-      user: MYSQL_CONFIG.user,
-      database: MYSQL_CONFIG.database,
-      ssl: !!MYSQL_CONFIG.ssl
-    }
+    config: { host: MYSQL_CONFIG.host, port: MYSQL_CONFIG.port, database: MYSQL_CONFIG.database }
   });
 });
 
@@ -496,26 +412,21 @@ app.get("/api/settings", async (req, res) => {
     showAdminPortalTab: true,
     devoteeTerms: 'Vedic rituals represent deep lineage devotion.'
   };
-  const settings = await mysqlGetSettings(defaults);
-  res.json(settings);
+  res.json(await mysqlGetSettings(defaults));
 });
 
 app.post("/api/settings", async (req, res) => {
-  const newSettings = req.body;
-  await mysqlSaveSettings(newSettings);
-  res.json({ success: true, settings: newSettings });
+  await mysqlSaveSettings(req.body);
+  res.json({ success: true, settings: req.body });
 });
 
 app.post("/api/upload", (req, res) => {
   const { filename, base64 } = req.body;
-  if (!filename || !base64) {
-    return res.status(400).json({ error: "Missing payload." });
-  }
+  if (!filename || !base64) return res.status(400).json({ error: "Missing payload." });
   try {
     let pureBase64 = base64.includes(";base64,") ? base64.split(";base64,").pop() || "" : base64;
     const safeName = `${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-    const targetPath = path.join(UPLOADS_DIR, safeName);
-    fs.writeFileSync(targetPath, Buffer.from(pureBase64, "base64"));
+    fs.writeFileSync(path.join(UPLOADS_DIR, safeName), Buffer.from(pureBase64, "base64"));
     res.json({ success: true, url: `/uploads/${safeName}` });
   } catch (err) {
     res.status(500).json({ error: "Failed to save asset." });
@@ -523,85 +434,55 @@ app.post("/api/upload", (req, res) => {
 });
 
 app.get("/api/pujas", async (req, res) => {
-  const pujas = await mysqlGetCollection("pujas", "pujas.json", PUJAS_DATA);
-  res.json(pujas);
+  res.json(await mysqlGetCollection("pujas", "pujas.json", PUJAS_DATA));
 });
 
 app.post("/api/pujas", async (req, res) => {
-  const newPujas = req.body;
-  if (!Array.isArray(newPujas)) return res.status(400).json({ error: "Must be an array." });
-  await mysqlSaveCollection("pujas", "pujas.json", newPujas, "id");
-  res.json({ success: true, pujas: newPujas });
+  if (!Array.isArray(req.body)) return res.status(400).json({ error: "Must be an array." });
+  await mysqlSaveCollection("pujas", "pujas.json", req.body, "id");
+  res.json({ success: true, pujas: req.body });
 });
 
 app.get("/api/bookings", async (req, res) => {
-  const defaults = [
-    {
-      id: 'BKG-9843-VEDA',
-      pujaId: 'satyanarayan',
-      pujaName: 'Sri Satyanarayan Puja',
-      customerName: 'Vikas Savita',
-      customerPhone: '+91 84450 30767',
-      customerEmail: 'vsvikash290@gmail.com',
-      gothra: 'Bhardwaj',
-      nakshatra: 'Rohini',
-      mode: 'e-puja',
-      dateTime: '2026-06-15T09:30',
-      price: 2100,
-      status: 'confirmed'
-    }
-  ];
-  const bookings = await mysqlGetCollection("bookings", "bookings.json", defaults);
-  res.json(bookings);
+  const defaults = [{
+    id: 'BKG-9843-VEDA', pujaId: 'satyanarayan', pujaName: 'Sri Satyanarayan Puja',
+    customerName: 'Vikas Savita', customerPhone: '+91 84450 30767', customerEmail: 'vsvikash290@gmail.com',
+    gothra: 'Bhardwaj', nakshatra: 'Rohini', mode: 'e-puja', dateTime: '2026-06-15T09:30', price: 2100, status: 'confirmed'
+  }];
+  res.json(await mysqlGetCollection("bookings", "bookings.json", defaults));
 });
 
 app.post("/api/bookings", async (req, res) => {
-  const newBookings = req.body;
-  if (!Array.isArray(newBookings)) return res.status(400).json({ error: "Must be an array." });
-
+  if (!Array.isArray(req.body)) return res.status(400).json({ error: "Must be an array." });
   try {
     const previousBookings = await mysqlGetCollection("bookings", "bookings.json", []);
-    for (const b of newBookings) {
+    for (const b of req.body) {
       if (b.status === 'confirmed') {
         const wasAlreadyConfirmed = previousBookings.some((prev: any) => prev.id === b.id && prev.status === 'confirmed');
-        if (!wasAlreadyConfirmed) {
-          await sendBookingConfirmationEmails(b);
-        }
+        if (!wasAlreadyConfirmed) await sendBookingConfirmationEmails(b);
       }
     }
-  } catch (err) {
-    console.error("Error triggering automation emails:", err);
-  }
-
-  await mysqlSaveCollection("bookings", "bookings.json", newBookings, "id");
-  res.json({ success: true, bookings: newBookings });
+  } catch (err) { /* silent fail */ }
+  await mysqlSaveCollection("bookings", "bookings.json", req.body, "id");
+  res.json({ success: true, bookings: req.body });
 });
 
 app.get("/api/email-logs", async (req, res) => {
-  const logs = await mysqlGetEmailLogs([]);
-  res.json(logs);
+  res.json(await mysqlGetEmailLogs([]));
 });
 
 app.get("/api/users", async (req, res) => {
-  const defaults = [
-    {
-      userId: 'vsvikash290@gmail.com',
-      passwordHash: 'password123',
-      fullName: 'Vikas Savita',
-      phone: '+91 84450 30767',
-      email: 'vsvikash290@gmail.com',
-      createdAt: '2026-05-18T10:00:00Z'
-    }
-  ];
-  const users = await mysqlGetCollection("users", "users.json", defaults);
-  res.json(users);
+  const defaults = [{
+    userId: 'vsvikash290@gmail.com', passwordHash: 'password123', fullName: 'Vikas Savita',
+    phone: '+91 84450 30767', email: 'vsvikash290@gmail.com', createdAt: '2026-05-18T10:00:00Z'
+  }];
+  res.json(await mysqlGetCollection("users", "users.json", defaults));
 });
 
 app.post("/api/users", async (req, res) => {
-  const newUsers = req.body;
-  if (!Array.isArray(newUsers)) return res.status(400).json({ error: "Must be an array." });
-  await mysqlSaveCollection("users", "users.json", newUsers, "userId");
-  res.json({ success: true, users: newUsers });
+  if (!Array.isArray(req.body)) return res.status(400).json({ error: "Must be an array." });
+  await mysqlSaveCollection("users", "users.json", req.body, "userId");
+  res.json({ success: true, users: req.body });
 });
 
 app.post("/api/chat", async (req, res) => {
@@ -615,7 +496,6 @@ app.post("/api/chat", async (req, res) => {
 
   const pujaCatalog = await mysqlGetCollection("pujas", "pujas.json", PUJAS_DATA);
   const catalogueDescription = pujaCatalog.map((p: any) => `- ${p.name}: ${p.tagline || ''}`).join("\n");
-
   const customInstruction = `You are "${name}", ${cert}. Bio: ${bio}. Mode: ${lang}. Catalog:\n${catalogueDescription}`;
 
   try {
@@ -633,7 +513,7 @@ app.post("/api/chat", async (req, res) => {
               inlineData: { data: fs.readFileSync(localFilePath).toString("base64"), mimeType: msg.attachedImageMime || "image/jpeg" }
             });
           }
-        } catch (imgErr) { console.error(imgErr); }
+        } catch { /* suppress */ }
       }
       return { role: msg.sender === "user" ? "user" : "model", parts };
     });
@@ -643,7 +523,6 @@ app.post("/api/chat", async (req, res) => {
       contents: formattedHistory,
       config: { systemInstruction: customInstruction, temperature: 0.7 }
     });
-
     res.json({ text: response.text || "Pranam. Let me meditate and reply shortly." });
   } catch (error: any) {
     res.json({ text: `Pranam. Connection paused. Please check your GEMINI_API_KEY configuration.`, fallback: true });
@@ -659,7 +538,6 @@ async function initServer() {
     app.use(express.static(distPath));
     app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
   }
-
   await ensureMysqlConnected();
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Pooja4Panditji server running on port ${PORT}`);
