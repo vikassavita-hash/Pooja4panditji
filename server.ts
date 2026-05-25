@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import nodemailer from "nodemailer";
+import { createPool, Pool, PoolConnection } from "mysql2/promise";
 import { PUJAS_DATA } from "./src/data/pujas";
 
 dotenv.config();
@@ -26,6 +27,205 @@ if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 app.use("/uploads", express.static(UPLOADS_DIR));
+
+const MYSQL_DATABASE_URL = process.env.DATABASE_URL || process.env.MYSQL_DATABASE_URL || process.env.CLEARDB_DATABASE_URL || "";
+const MYSQL_CONFIG = MYSQL_DATABASE_URL
+  ? parseDatabaseUrl(MYSQL_DATABASE_URL)
+  : {
+      host: process.env.MYSQL_HOST || process.env.DB_HOST || "localhost",
+      user: process.env.MYSQL_USER || process.env.DB_USER || "",
+      password: process.env.MYSQL_PASSWORD || process.env.DB_PASSWORD || "",
+      database: process.env.MYSQL_DATABASE || process.env.DB_NAME || "",
+      port: parseInt(process.env.MYSQL_PORT || process.env.DB_PORT || "3306", 10),
+      ssl:
+        process.env.MYSQL_SSL === "true" || process.env.MYSQL_SSL === "1"
+          ? { rejectUnauthorized: true }
+          : undefined
+    };
+
+const MYSQL_POOL: Pool | null = MYSQL_CONFIG.user && MYSQL_CONFIG.password && MYSQL_CONFIG.database
+  ? createPool({
+      host: MYSQL_CONFIG.host,
+      user: MYSQL_CONFIG.user,
+      password: MYSQL_CONFIG.password,
+      database: MYSQL_CONFIG.database,
+      port: MYSQL_CONFIG.port,
+      ssl: MYSQL_CONFIG.ssl,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      decimalNumbers: true
+    })
+  : null;
+
+let mysqlReady = false;
+
+function parseDatabaseUrl(url: string) {
+  const parsed = new URL(url);
+  return {
+    host: parsed.hostname,
+    port: parseInt(parsed.port || "3306", 10),
+    user: decodeURIComponent(parsed.username),
+    password: decodeURIComponent(parsed.password),
+    database: parsed.pathname?.slice(1) || "",
+    ssl:
+      parsed.searchParams.get("ssl") === "true"
+        ? { rejectUnauthorized: true }
+        : undefined
+  };
+}
+
+async function ensureMysqlConnected() {
+  if (!MYSQL_POOL) return false;
+  if (mysqlReady) return true;
+  try {
+    const conn = await MYSQL_POOL.getConnection();
+    await conn.ping();
+    await ensureMysqlTables(conn);
+    conn.release();
+    mysqlReady = true;
+    return true;
+  } catch (err) {
+    console.error("[MySQL] connection failed, falling back to local JSON files:", err);
+    return false;
+  }
+}
+
+async function ensureMysqlTables(conn: PoolConnection) {
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS settings (
+      id INT PRIMARY KEY,
+      value JSON NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS pujas (
+      id VARCHAR(255) PRIMARY KEY,
+      data JSON NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS bookings (
+      id VARCHAR(255) PRIMARY KEY,
+      data JSON NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS users (
+      userId VARCHAR(255) PRIMARY KEY,
+      data JSON NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS email_logs (
+      id VARCHAR(255) PRIMARY KEY,
+      data JSON NOT NULL,
+      createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+}
+
+function safeParseJson(value: any) {
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+  return value;
+}
+
+async function mysqlGetSettings(defaults: any) {
+  if (!(await ensureMysqlConnected())) return readDbFile("settings.json", defaults);
+  const [rows]: any = await MYSQL_POOL!.query(`SELECT value FROM settings WHERE id = 1 LIMIT 1`);
+  const record = rows[0];
+  if (record?.value) {
+    return safeParseJson(record.value);
+  }
+  await MYSQL_POOL!.execute(`INSERT INTO settings (id, value) VALUES (1, ?)`, [JSON.stringify(defaults)]);
+  return defaults;
+}
+
+async function mysqlSaveSettings(settings: any) {
+  if (!(await ensureMysqlConnected())) {
+    writeDbFile("settings.json", settings);
+    return;
+  }
+  await MYSQL_POOL!.execute(
+    `INSERT INTO settings (id, value) VALUES (1, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)`,
+    [JSON.stringify(settings)]
+  );
+}
+
+async function mysqlGetCollection(table: string, filename: string, defaults: any[]) {
+  if (!(await ensureMysqlConnected())) return readDbFile(filename, defaults);
+  const [rows]: any = await MYSQL_POOL!.query(`SELECT data FROM ${table}`);
+  const result = (rows as any[]).map((row) => safeParseJson(row.data));
+  if (result.length === 0 && defaults.length > 0) {
+    await mysqlSaveCollection(table, filename, defaults, table === "users" ? "userId" : "id");
+    return defaults;
+  }
+  return result;
+}
+
+async function mysqlSaveCollection(table: string, filename: string, items: any[], idField: string) {
+  if (!(await ensureMysqlConnected())) {
+    writeDbFile(filename, items);
+    return;
+  }
+  const conn = await MYSQL_POOL!.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.execute(`DELETE FROM ${table}`);
+    if (items.length > 0) {
+      const values = items.map((item) => [item[idField] || item.id || `GEN-${Date.now()}-${Math.floor(Math.random() * 10000)}`, JSON.stringify(item)]);
+      await conn.query(`INSERT INTO ${table} (${idField}, data) VALUES ?`, [values]);
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    console.error(`[MySQL] Failed to persist ${table}, writing to local JSON fallback:`, err);
+    writeDbFile(filename, items);
+  } finally {
+    conn.release();
+  }
+}
+
+async function mysqlAppendEmailLogs(logs: any[]) {
+  if (!(await ensureMysqlConnected())) {
+    const existingLogs = readDbFile("email_logs.json", []);
+    existingLogs.unshift(...logs);
+    writeDbFile("email_logs.json", existingLogs);
+    return;
+  }
+
+  const conn = await MYSQL_POOL!.getConnection();
+  try {
+    await conn.beginTransaction();
+    for (const log of logs) {
+      await conn.execute(
+        `INSERT INTO email_logs (id, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)`,
+        [log.id, JSON.stringify(log)]
+      );
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    console.error("[MySQL] Failed to persist email log entries, falling back to JSON:", err);
+    const existingLogs = readDbFile("email_logs.json", []);
+    existingLogs.unshift(...logs);
+    writeDbFile("email_logs.json", existingLogs);
+  } finally {
+    conn.release();
+  }
+}
+
+async function mysqlGetEmailLogs(defaults: any[]) {
+  if (!(await ensureMysqlConnected())) return readDbFile("email_logs.json", defaults);
+  const [rows]: any = await MYSQL_POOL!.query(`SELECT data FROM email_logs ORDER BY createdAt DESC`);
+  return (rows as any[]).map((row) => safeParseJson(row.data));
+}
 
 function readDbFile(filename: string, defaultValue: any) {
   const filePath = path.join(DB_DIR, filename);
@@ -119,7 +319,7 @@ async function sendBookingConfirmationEmails(booking: any) {
     googleAppPassword: ''
   };
   
-  const settings = readDbFile("settings.json", defaults);
+  const settings = await mysqlGetSettings(defaults);
   const senderEmail = settings.gmailAddress || 'shri.panditji.vedas@gmail.com';
 
   try {
@@ -214,9 +414,6 @@ async function sendBookingConfirmationEmails(booking: any) {
     const adminRes = await tx.sendMail(adminMailOptions);
     const devoteeRes = await tx.sendMail(devoteeMailOptions);
 
-    const logFile = "email_logs.json";
-    const existingLogs = readDbFile(logFile, []);
-    
     const logsToAdd = [
       {
         id: `EMAIL-ADM-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -238,16 +435,12 @@ async function sendBookingConfirmationEmails(booking: any) {
       }
     ];
 
-    existingLogs.unshift(...logsToAdd);
-    writeDbFile(logFile, existingLogs);
+    await mysqlAppendEmailLogs(logsToAdd);
 
   } catch (err: any) {
     console.error("[Email Engine] Failed to dispatch booking emails:", err);
     
-    // Save SMTP transmission error details into the email ledger
-    const logFile = "email_logs.json";
-    const existingLogs = readDbFile(logFile, []);
-    existingLogs.unshift({
+    const errorLog = {
       id: `EMAIL-ERR-${Date.now()}`,
       timestamp: new Date().toISOString(),
       from: senderEmail,
@@ -258,8 +451,8 @@ async function sendBookingConfirmationEmails(booking: any) {
         <strong>Hint:</strong> Please verify in "Global Devotion Settings" if your Gmail Address matches perfectly and your Google App Password (16 characters from google security account) matches perfectly without spaces.
       </div>`,
       status: `Failed: ${err.message || 'Unknown SMTP error'}`
-    });
-    writeDbFile(logFile, existingLogs);
+    };
+    await mysqlAppendEmailLogs([errorLog]);
   }
 }
 
@@ -304,12 +497,13 @@ Key Professional Directives:
 `;
 
 // API Routes
-app.get("/api/health", (req, res) => {
-  res.json({ status: "healthy", timestamp: new Date().toISOString() });
+app.get("/api/health", async (req, res) => {
+  const dbAvailable = await ensureMysqlConnected();
+  res.json({ status: "healthy", timestamp: new Date().toISOString(), mysql: dbAvailable ? "connected" : "unavailable" });
 });
 
 // Settings REST APIs
-app.get("/api/settings", (req, res) => {
+app.get("/api/settings", async (req, res) => {
   const defaults = {
     contactPhone: '+91 84450 30767',
     whatsappNumber: '+91 84450 30767',
@@ -325,13 +519,13 @@ app.get("/api/settings", (req, res) => {
     showAdminPortalTab: true,
     devoteeTerms: '1. All devotion services (Shradha Dakshina) are verified secure.\n2. The simulated handshakes are for instructional, direct, offline and virtual connect.\n3. By booking any puja, the devotee agrees to provide accurate Birth coordinates, Gothra and Nakshatra.\n4. Standard 24 Hours validity applies to digital chatbot and voice consult channels.\n5. Vedic rituals represent deep lineage devotion.'
   };
-  const settings = readDbFile("settings.json", defaults);
+  const settings = await mysqlGetSettings(defaults);
   res.json(settings);
 });
 
-app.post("/api/settings", (req, res) => {
+app.post("/api/settings", async (req, res) => {
   const newSettings = req.body;
-  writeDbFile("settings.json", newSettings);
+  await mysqlSaveSettings(newSettings);
   res.json({ success: true, settings: newSettings });
 });
 
@@ -364,22 +558,22 @@ app.post("/api/upload", (req, res) => {
 });
 
 // Catalog Pujas REST APIs
-app.get("/api/pujas", (req, res) => {
-  const pujas = readDbFile("pujas.json", PUJAS_DATA);
+app.get("/api/pujas", async (req, res) => {
+  const pujas = await mysqlGetCollection("pujas", "pujas.json", PUJAS_DATA);
   res.json(pujas);
 });
 
-app.post("/api/pujas", (req, res) => {
+app.post("/api/pujas", async (req, res) => {
   const newPujas = req.body;
   if (!Array.isArray(newPujas)) {
     return res.status(400).json({ error: "Catalog must be an array." });
   }
-  writeDbFile("pujas.json", newPujas);
+  await mysqlSaveCollection("pujas", "pujas.json", newPujas, "id");
   res.json({ success: true, pujas: newPujas });
 });
 
 // Bookings REST APIs
-app.get("/api/bookings", (req, res) => {
+app.get("/api/bookings", async (req, res) => {
   const defaults = [
     {
       id: 'BKG-9843-VEDA',
@@ -408,11 +602,11 @@ app.get("/api/bookings", (req, res) => {
       notes: "Please pray for my mother's speedy recovery."
     }
   ];
-  const bookings = readDbFile("bookings.json", defaults);
+  const bookings = await mysqlGetCollection("bookings", "bookings.json", defaults);
   res.json(bookings);
 });
 
-app.post("/api/bookings", (req, res) => {
+app.post("/api/bookings", async (req, res) => {
   const newBookings = req.body;
   if (!Array.isArray(newBookings)) {
     return res.status(400).json({ error: "Bookings must be an array." });
@@ -420,12 +614,12 @@ app.post("/api/bookings", (req, res) => {
 
   // Handle email triggers for newly confirmed bookings
   try {
-    const previousBookings = readDbFile("bookings.json", []);
+    const previousBookings = await mysqlGetCollection("bookings", "bookings.json", []);
     for (const b of newBookings) {
       if (b.status === 'confirmed') {
         const wasAlreadyConfirmed = previousBookings.some((prev: any) => prev.id === b.id && prev.status === 'confirmed');
         if (!wasAlreadyConfirmed) {
-          sendBookingConfirmationEmails(b);
+          await sendBookingConfirmationEmails(b);
         }
       }
     }
@@ -433,18 +627,18 @@ app.post("/api/bookings", (req, res) => {
     console.error("Error checking bookings for email dispatches:", err);
   }
 
-  writeDbFile("bookings.json", newBookings);
+  await mysqlSaveCollection("bookings", "bookings.json", newBookings, "id");
   res.json({ success: true, bookings: newBookings });
 });
 
 // Email dispatch logs endpoint for admin verification
-app.get("/api/email-logs", (req, res) => {
-  const logs = readDbFile("email_logs.json", []);
+app.get("/api/email-logs", async (req, res) => {
+  const logs = await mysqlGetEmailLogs([]);
   res.json(logs);
 });
 
 // Users REST APIs
-app.get("/api/users", (req, res) => {
+app.get("/api/users", async (req, res) => {
   const defaults = [
     {
       userId: 'vsvikash290@gmail.com',
@@ -467,16 +661,16 @@ app.get("/api/users", (req, res) => {
       createdAt: '2026-05-18T10:00:00Z'
     }
   ];
-  const users = readDbFile("users.json", defaults);
+  const users = await mysqlGetCollection("users", "users.json", defaults);
   res.json(users);
 });
 
-app.post("/api/users", (req, res) => {
+app.post("/api/users", async (req, res) => {
   const newUsers = req.body;
   if (!Array.isArray(newUsers)) {
     return res.status(400).json({ error: "Users list must be an array." });
   }
-  writeDbFile("users.json", newUsers);
+  await mysqlSaveCollection("users", "users.json", newUsers, "userId");
   res.json({ success: true, users: newUsers });
 });
 
