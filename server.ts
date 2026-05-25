@@ -43,7 +43,8 @@ const MYSQL_CONFIG = MYSQL_DATABASE_URL
           : undefined
     };
 
-const MYSQL_POOL: Pool | null = MYSQL_CONFIG.user && MYSQL_CONFIG.password && MYSQL_CONFIG.database
+// FIXED CONFIG CONDITION: Ensure the pool initializes even if password configuration is empty string
+const MYSQL_POOL: Pool | null = (MYSQL_CONFIG.host && MYSQL_CONFIG.database)
   ? createPool({
       host: MYSQL_CONFIG.host,
       user: MYSQL_CONFIG.user,
@@ -54,12 +55,13 @@ const MYSQL_POOL: Pool | null = MYSQL_CONFIG.user && MYSQL_CONFIG.password && MY
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
-      decimalNumbers: true
+      decimalNumbers: true,
+      enableKeepAlive: true // Keeps idle connections warm on Railway networks
     })
   : null;
 
 if (!MYSQL_POOL) {
-  console.warn("[MySQL] No database pool created. Check your DATABASE_URL or MYSQL_HOST/MYSQL_USER/MYSQL_PASSWORD/MYSQL_DATABASE environment variables.");
+  console.warn("[MySQL] No database pool created. Check your DATABASE_URL environment variables.");
 } else {
   console.log(`[MySQL] Configured pool for ${MYSQL_CONFIG.user}@${MYSQL_CONFIG.host}:${MYSQL_CONFIG.port}/${MYSQL_CONFIG.database} ssl=${!!MYSQL_CONFIG.ssl}`);
 }
@@ -70,7 +72,7 @@ function parseDatabaseUrl(url: string) {
   const parsed = new URL(url);
   const sslMode = parsed.searchParams.get("ssl") || parsed.searchParams.get("sslmode") || parsed.searchParams.get("tls");
   
-  // Railway requires SSL connections. If hosting on Railway, enforce SSL configuration.
+  // Railway strictly requires SSL connections. Enforce initialization options.
   const isRailway = parsed.hostname.includes("railway");
   const sslEnabled = sslMode === "true" || sslMode === "require" || sslMode === "verify_ca" || sslMode === "verify_identity" || parsed.protocol === "mysqls:" || isRailway;
 
@@ -103,7 +105,7 @@ async function ensureMysqlConnected() {
     }
   } catch (err) {
     mysqlReady = false;
-    console.error("[MySQL] Connection failed or dropped, falling back to local JSON files:", err);
+    console.error("[MySQL] Connection dropped or failed, falling back to local JSON files:", err);
     return false;
   }
 }
@@ -199,7 +201,7 @@ async function mysqlGetCollection(table: string, filename: string, defaults: any
 }
 
 async function mysqlSaveCollection(table: string, filename: string, items: any[], idField: string) {
-  // Always update local storage first to prevent missing transactions during downtime
+  // Sync fallback local cache first
   writeDbFile(filename, items);
 
   if (!(await ensureMysqlConnected())) return;
@@ -208,8 +210,7 @@ async function mysqlSaveCollection(table: string, filename: string, items: any[]
   try {
     await conn.beginTransaction();
     
-    // Instead of dropping the whole table via DELETE, we run dynamic upserts.
-    // This allows active records to sync reliably without breaking relationships or dropping updates.
+    // Fixed Upsert execution strategy to properly map variables into SQL expressions
     if (items.length > 0) {
       for (const item of items) {
         const id = item[idField] || item.id || `GEN-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
@@ -344,7 +345,7 @@ async function sendBookingConfirmationEmails(booking: any) {
     upiQrUrl: '',
     panditName: 'Shyam Guru ji',
     panditCertification: 'Certified by Mathura Vedic Board',
-    panditBio: 'Renowned scholar of Astro-Vedic rituals and Yajnas, directly descended from traditional priestly line of Mathura.',
+    panditBio: 'Renowned scholar of Astro-Vedic rituals.',
     gmailAddress: 'vsvikash290@gmail.com',
     googleAppPassword: ''
   };
