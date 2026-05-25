@@ -8,7 +8,7 @@ import {
   Sparkles, ShieldCheck, CreditCard, Clock, MapPin, Globe, CheckCircle2, 
   Calendar, Check, User, Phone, Mail, Award, ArrowRight, MessageSquare, 
   AlertTriangle, Play, HelpCircle, FileText, Smartphone, ExternalLink,
-  ChevronRight, Lock, RefreshCw, Volume2, Info, CheckSquare
+  ChevronRight, Lock, RefreshCw, Volume2, Info, CheckSquare, Paperclip, Camera
 } from 'lucide-react';
 
 export default function App() {
@@ -85,10 +85,20 @@ export default function App() {
     }
     return [
       {
+        userId: 'vsvikash290@gmail.com',
+        passwordHash: 'password123',
+        fullName: 'Vikas Savita',
+        phone: '+91 84450 30767',
+        email: 'vsvikash290@gmail.com',
+        gothra: 'Bhardwaj',
+        nakshatra: 'Rohini',
+        createdAt: '2026-05-18T10:00:00Z'
+      },
+      {
         userId: 'vikas.savita@smollan.com',
         passwordHash: 'password123',
         fullName: 'Vikas Savita',
-        phone: '+91 84450 30767 ',
+        phone: '+91 84450 30767',
         email: 'vikas.savita@smollan.com',
         gothra: 'Bhardwaj',
         nakshatra: 'Rohini',
@@ -251,7 +261,7 @@ export default function App() {
         pujaName: 'Sri Satyanarayan Puja',
         pujaImage: 'https://images.unsplash.com/photo-1609137144814-6330bf4cb51b?auto=format&fit=crop&q=80&w=600',
         customerName: 'Vikas Savita',
-        customerPhone: '+91 84450 30767',
+        customerPhone: '+91 98765 43210',
         customerEmail: 'vikas.savita@smollan.com',
         gothra: 'Bhardwaj',
         nakshatra: 'Rohini',
@@ -373,6 +383,51 @@ export default function App() {
   const [selectedChatLanguage, setSelectedChatLanguage] = useState<string>('multilingual');
   const chatBottomRef = useRef<HTMLDivElement>(null);
 
+  // Divine Chat Attachment States
+  const [chatAttachedImage, setChatAttachedImage] = useState<string | null>(null);
+  const [chatAttachedImageMime, setChatAttachedImageMime] = useState<string | null>(null);
+  const [isUploadingChatImage, setIsUploadingChatImage] = useState(false);
+  const [chatUploadError, setChatUploadError] = useState('');
+
+  const handleChatImageUploadChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingChatImage(true);
+    setChatUploadError('');
+    try {
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Please upload an actual image file (JPEG/PNG/WebP).');
+      }
+
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (err) => reject(err);
+      });
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, base64 })
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        setChatAttachedImage(data.url);
+        setChatAttachedImageMime(file.type);
+        console.log(`[Vedic Attachment] Attached file path: ${data.url}`);
+      } else {
+        throw new Error(data.error || 'Server rejected file upload');
+      }
+    } catch (err: any) {
+      console.error("Chat attachment uploader fallback:", err);
+      setChatUploadError(err.message || 'Failed to attach photo.');
+    } finally {
+      setIsUploadingChatImage(false);
+    }
+  };
+
   // Dynamically load user-specific or guest-specific chat history when login status changes
   useEffect(() => {
     const email = currentUser ? currentUser.email : 'guest';
@@ -412,10 +467,19 @@ export default function App() {
     localStorage.setItem(key, JSON.stringify(chatMessages));
   }, [chatMessages, currentUser]);
 
-  // Scroll to bottom of chat
+  // Scroll to bottom of chat container specifically, avoiding page-level scroll jumps
   useEffect(() => {
-    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages, chatLoading]);
+    const container = document.getElementById('chat-messages-container');
+    if (container) {
+      // Small timeout to give DOM a frame to compute new height
+      const tm = setTimeout(() => {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      }, 50);
+      return () => clearTimeout(tm);
+    } else {
+      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages.length, chatLoading]);
 
   // Countdown timer for simulated live payment QR
   const [qrCountdown, setQrCountdown] = useState(300); // 5 minutes
@@ -565,13 +629,19 @@ export default function App() {
     const userText = userChatInput;
     setUserChatInput('');
 
-    // Prepend user message locally
+    // Prepend user message locally with optional physical image attachment
     const userMsg: ChatMessage = {
       id: `user-msg-${Date.now()}`,
       sender: 'user',
       text: userText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      attachedImageUrl: chatAttachedImage || undefined,
+      attachedImageMime: chatAttachedImageMime || undefined
     };
+
+    // Reset local attachment staging states
+    setChatAttachedImage(null);
+    setChatAttachedImageMime(null);
 
     const updatedMessages = [...chatMessages, userMsg];
     setChatMessages(updatedMessages);
@@ -846,7 +916,9 @@ export default function App() {
                     { id: 'prosperity', title: 'Wealth & Prosperity' },
                     { id: 'milestones', title: 'Milestones & Vastu' },
                     { id: 'peace', title: 'Mental Peace' },
-                    { id: 'remedial', title: 'Health & Protection' }
+                    { id: 'remedial', title: 'Health & Protection' },
+                    { id: 'education', title: 'Education & Intellect' },
+                    { id: 'ancestral', title: 'Ancestors & Shradh' }
                   ].map((cat) => (
                     <button
                       key={cat.id}
@@ -912,43 +984,46 @@ export default function App() {
         {activeTab === 'chat' && (() => {
           const userMsgsCount = chatMessages.filter(msg => msg.sender === 'user').length;
           return (
-            <div className="max-w-4xl mx-auto bg-white rounded-2xl border border-saffron-100 shadow-xl overflow-hidden flex flex-col h-[650px] animate-fadeIn" id="pandit-chatbot-view">
+            <div className="max-w-4xl mx-auto bg-amber-50/5 rounded-3xl border border-saffron-100/80 shadow-2xl overflow-hidden flex flex-col h-[680px] animate-fadeIn" id="pandit-chatbot-view">
               
-              {/* Chatbot Header */}
-              <div className="p-4 bg-linear-to-r from-saffron-600 to-saffron-700 text-white flex items-center justify-between border-b border-saffron-700">
-                <div className="flex items-center gap-3">
+              {/* Premium Divine Chatbot Header */}
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-amber-950 via-saffron-950 to-amber-950 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gold-500/30 shadow-md">
+                <div className="flex items-center gap-3.5">
                   <div className="relative">
-                    <div className="w-12 h-12 rounded-full bg-amber-100 border-2 border-gold-300 flex items-center justify-center text-2xl shadow-inner select-none">
+                    <div className="w-14 h-14 rounded-full bg-linear-to-br from-amber-50 to-amber-100 border-2 border-gold-400 flex items-center justify-center text-3xl shadow-lg select-none">
                       {settings.panditImage || '👳🏽'}
                     </div>
-                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse"></span>
+                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-amber-950 animate-pulse"></span>
                   </div>
                   <div>
-                    <div className="flex items-center gap-1.5">
-                      <h3 className="font-bold font-display text-base tracking-wide text-white">{settings.panditName || 'Shyam Guru ji'}</h3>
-                      <span className="bg-gold-500 text-saffron-950 text-[10px] font-bold px-1.5 py-0.5 rounded-full uppercase">Sanskrit Acharya</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-extrabold font-display text-lg tracking-wide text-amber-50">{settings.panditName || 'Shyam Guru ji'}</h3>
+                      <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">Sanskrit Acharya</span>
                     </div>
-                    <p className="text-xs text-saffron-100 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-300"></span>
-                      Online & Meditating on Devotee Enquiries
+                    <p className="text-xs text-saffron-200/90 flex items-center gap-1.5 mt-0.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                      <span className="font-medium">Online & Performing Prarthana Mandir Guidance</span>
                     </p>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-2.5 text-xs text-saffron-50">
-                  <div className="hidden sm:block text-right bg-white/10 px-3 py-1 bg-opacity-10 rounded-lg">
-                    <p className="text-[10px] text-orange-200">{settings.panditCertification || 'Certified by Mathura'}</p>
-                    <p className="font-bold font-display text-gold-100">📞 Live Audio Consults Enabled</p>
+                <div className="flex items-center gap-3 text-xs">
+                  <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-right">
+                    <p className="text-[10px] text-amber-300 uppercase tracking-widest font-bold">{settings.panditCertification || 'Certified by Mathura'}</p>
+                    <p className="font-extrabold font-display text-gold-300 flex items-center gap-1 mt-0.5 justify-end">
+                      <span>📞 Voice consultations Active</span>
+                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* Multilingual communication bar */}
-              <div className="bg-saffron-50/70 border-b border-saffron-100 px-4 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
-                <span className="text-saffron-900 font-bold flex items-center gap-1.5 shrink-0">
-                  🗣️ Communication Language:
+              {/* Elegant Multilingual Selector Panel */}
+              <div className="bg-gradient-to-r from-saffron-50/60 to-amber-50/45 border-b border-saffron-100/60 px-4 py-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+                <span className="text-amber-950 font-extrabold flex items-center gap-2 shrink-0">
+                  <span>🌐</span>
+                  <span>Select Consultation Language:</span>
                 </span>
-                <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto no-scrollbar scroll-smooth">
+                <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-thin">
                   {[
                     { code: 'multilingual', label: '🔀 Multilingual' },
                     { code: 'Hindi', label: '🇮🇳 हिंदी (Hindi)' },
@@ -962,10 +1037,10 @@ export default function App() {
                       key={lang.code}
                       type="button"
                       onClick={() => setSelectedChatLanguage(lang.code)}
-                      className={`px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap border ${
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap border ${
                         selectedChatLanguage === lang.code
-                          ? 'bg-saffron-600 border-saffron-600 text-white shadow-xs'
-                          : 'bg-white border-saffron-200 text-saffron-800 hover:bg-saffron-50'
+                          ? 'bg-saffron-600 border-saffron-700 text-white shadow-md'
+                          : 'bg-white border-saffron-100 text-saffron-900 hover:bg-saffron-50/80 hover:border-saffron-200'
                       }`}
                     >
                       {lang.label}
@@ -974,15 +1049,15 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Direct Pandit call bar */}
+              {/* VIP Live Support Alert Ribbon */}
               {!hasDirectPanditAccess ? (
-                <div className="bg-amber-50/90 border-b border-amber-200 px-4 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
-                  <span className="text-amber-900 font-medium flex items-center gap-2 text-center sm:text-left">
-                    <span className="flex h-2 w-2 relative shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+                <div className="bg-amber-50/60 border-b border-amber-200/50 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                  <span className="text-amber-900 font-medium flex items-center gap-2 text-center sm:text-left leading-relaxed">
+                    <span className="flex h-2.5 w-2.5 relative shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-500 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-orange-600"></span>
                     </span>
-                    <span><strong>AI chat has 3 complimentary queries.</strong> Connect with human {settings.panditName || 'Shyam Guru ji'} directly over Voice Call & VIP WhatsApp!</span>
+                    <span><strong>Complimentary Trial:</strong> Standard AI chat is restricted to 3 messages. Connect with real {settings.panditName || 'Shyam Guru ji'} over WhatsApp & VIP Call!</span>
                   </span>
                   <button
                     type="button"
@@ -998,18 +1073,18 @@ export default function App() {
                         setIsConsultModalOpen(true);
                       }
                     }}
-                    className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-3 py-1 rounded-lg shadow-xs transition shrink-0 cursor-pointer text-[11px] animate-pulse"
+                    className="bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded-xl shadow-xs transition cursor-pointer shrink-0 hover:scale-102 hover:shadow-md"
                   >
-                    {previouslyPaidPandit ? `Renew Call & VIP Chat (₹125)` : `Connect Direct Pandit (₹251)`}
+                    {previouslyPaidPandit ? `Renew Live Consult (₹125)` : `Unlock Direct Pandit (₹251)`}
                   </button>
                 </div>
               ) : (
-                <div className="bg-emerald-50 border-b border-emerald-150 px-4 py-2 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
-                  <span className="text-emerald-900 font-bold flex flex-wrap items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <div className="bg-emerald-50/70 border-b border-emerald-100 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                  <span className="text-emerald-950 font-bold flex flex-wrap items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                     <span>🌟 VIP Devotee Access Active: Unlimited chats & live voice call helpline active!</span>
                     {directPanditExpiry && (
-                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-medium px-2 py-0.5 rounded-full">
+                      <span className="bg-emerald-100/80 text-emerald-900 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-emerald-200/50 animate-pulse">
                         {Math.max(1, Math.ceil((directPanditExpiry - Date.now()) / (1000 * 60 * 60)))} hours left (ends {new Date(directPanditExpiry).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})
                       </span>
                     )}
@@ -1019,7 +1094,7 @@ export default function App() {
                     target="_blank"
                     rel="noreferrer"
                     referrerPolicy="no-referrer"
-                    className="bg-emerald-650 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-md shadow-xs text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer transition shrink-0"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl shadow-xs text-[11px] font-black uppercase tracking-wider inline-flex items-center gap-1.5 cursor-pointer transition hover:scale-102"
                   >
                     💬 Live WhatsApp
                   </a>
@@ -1027,34 +1102,50 @@ export default function App() {
               )}
 
               {/* Chat Log Window */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-saffron-50/10 space-y-4 font-sans" id="chat-messages-container">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gradient-to-b from-amber-50/10 via-white to-amber-50/5 space-y-6 font-sans scroll-smooth" id="chat-messages-container">
                 
                 {chatMessages.map((msg) => (
                   <div 
                     key={msg.id} 
-                    className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-slideUp`}
+                    className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-fadeIn`}
                   >
-                    <div className={`flex items-start gap-2.5 max-w-[85%] ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
+                    <div className={`flex items-start gap-3 max-w-[80%] ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
                       
-                      {/* Avatar icon */}
-                      <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-sm shrink-0 border border-saffron-200 shadow-xs select-none">
+                      {/* High-quality styled Avatar */}
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-base shrink-0 border shadow-xs select-none ${
+                        msg.sender === 'user' 
+                          ? 'bg-saffron-50 border-saffron-200 text-gray-700' 
+                          : 'bg-amber-100 border-gold-300 text-amber-950'
+                      }`}>
                         {msg.sender === 'user' ? '👤' : '👳🏽'}
                       </div>
 
-                      {/* Chat Bubble card */}
-                      <div className={`p-4 rounded-2xl shadow-xs border ${
+                      {/* Redesigned Bubble with High-Readability Contrast Typography */}
+                      <div className={`p-4 sm:p-5 rounded-2xl border transition-all duration-200 ${
                         msg.sender === 'user' 
-                          ? 'bg-linear-to-br from-saffron-500 to-saffron-600 text-white border-saffron-600 rounded-tr-none' 
-                          : 'bg-white text-gray-800 border-saffron-100 rounded-tl-none'
+                          ? 'bg-gradient-to-br from-saffron-500 to-saffron-600 text-white border-saffron-500 rounded-tr-none shadow-md' 
+                          : 'bg-white text-gray-800 border-saffron-100/80 rounded-tl-none shadow-xs hover:border-saffron-200/50'
                       }`}>
-                        <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                        <div className="text-sm sm:text-[14px] leading-relaxed whitespace-pre-wrap font-medium font-sans">
                           {msg.text}
                         </div>
-                        <span className={`block text-[10px] mt-1.5 text-right ${
+                        {msg.attachedImageUrl && (
+                          <div className="mt-3.5 rounded-xl overflow-hidden border border-black/10 max-w-xs shadow-xs bg-black/5">
+                            <img
+                              src={msg.attachedImageUrl}
+                              alt="Devotee uploaded attachment"
+                              className="max-h-56 w-full object-contain"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        )}
+                        <div className={`flex items-center gap-1.5 mt-2 justify-end text-[9px] font-bold tracking-wider uppercase ${
                           msg.sender === 'user' ? 'text-saffron-100' : 'text-gray-400'
                         }`}>
-                          {msg.timestamp}
-                        </span>
+                          <span>{msg.sender === 'user' ? 'Devotee' : 'Swami G'}</span>
+                          <span>•</span>
+                          <span>{msg.timestamp}</span>
+                        </div>
                       </div>
 
                     </div>
@@ -1063,19 +1154,19 @@ export default function App() {
 
                 {/* Chatbot typing loading animation */}
                 {chatLoading && (
-                  <div className="flex justify-start animate-pulse">
-                    <div className="flex items-start gap-2.5 max-w-[80%]">
-                      <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-sm shrink-0 border border-saffron-200">
+                  <div className="flex justify-start">
+                    <div className="flex items-start gap-3 max-w-[80%]">
+                      <div className="w-9 h-9 rounded-full bg-amber-100 border border-gold-300 flex items-center justify-center text-base shrink-0">
                         👳🏽
                       </div>
-                      <div className="p-4 rounded-2xl bg-white text-gray-800 border border-saffron-100 rounded-tl-none shadow-xs">
-                        <div className="flex items-center gap-1 text-xs text-gray-400 font-medium">
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-saffron-500" />
-                          <span>Pandit Ji is consulting astral almanac/scriptures...</span>
+                      <div className="p-4 rounded-2xl bg-white text-gray-800 border border-saffron-100/60 rounded-tl-none shadow-xs max-w-sm">
+                        <div className="flex items-center gap-2 text-xs text-gray-500 font-bold">
+                          <RefreshCw className="w-4 h-4 animate-spin text-saffron-600" />
+                          <span>Swami G is evaluating astrological aspects...</span>
                         </div>
-                        <div className="flex gap-1 mt-2">
-                          <span className="w-2 h-2 rounded-full bg-saffron-400 animate-bounce delay-100"></span>
-                          <span className="w-2 h-2 rounded-full bg-saffron-500 animate-bounce delay-200"></span>
+                        <div className="flex gap-1.5 mt-3 pl-1">
+                          <span className="w-2 h-2 rounded-full bg-saffron-400 animate-bounce delay-75"></span>
+                          <span className="w-2 h-2 rounded-full bg-saffron-500 animate-bounce delay-150"></span>
                           <span className="w-2 h-2 rounded-full bg-saffron-600 animate-bounce delay-300"></span>
                         </div>
                       </div>
@@ -1086,19 +1177,31 @@ export default function App() {
                 <div ref={chatBottomRef}></div>
               </div>
 
-              {/* Dynamic Gatekeeper Input or Form */}
-              {userMsgsCount >= 3 && !hasDirectPanditAccess ? (
-                <div className="p-6 bg-linear-to-b from-amber-50 to-orange-50/50 border-t border-saffron-150 text-center space-y-4 animate-fadeIn">
-                  <div className="w-12 h-12 bg-amber-100/90 border border-saffron-300 rounded-full flex items-center justify-center mx-auto text-xl">
+              {/* Dynamic Gatekeeper Paywall / Dakshina Board */}
+              {userMsgsCount >= 3 && !hasDirectPanditAccess && (
+                <div className="p-6 bg-gradient-to-b from-amber-50 via-orange-50/80 to-amber-50 border-t border-saffron-200 text-center space-y-4 animate-fadeIn relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-gold-300 via-saffron-500 to-gold-300"></div>
+                  
+                  <div className="w-12 h-12 bg-linear-to-br from-gold-100 to-amber-200 border border-gold-300 rounded-full flex items-center justify-center mx-auto text-xl shadow-md">
                     🕉️
                   </div>
-                  <div className="max-w-md mx-auto space-y-1.5">
-                    <h4 className="text-sm font-extrabold text-saffron-850 uppercase tracking-widest font-display">Complimentary AI Queries Completed</h4>
-                    <p className="text-xs text-gray-650 leading-relaxed font-sans">
-                      Pranam Devotee! You have requested 3 free guidance summaries. Continuous astrological deep-dives, specialized Gotra muhurats, and directly discussing with {settings.panditName || 'Shyam Guru ji'} on a personal phone call require a small **Shradha Dakshina (Vedic token)**.
+                  <div className="max-w-md mx-auto space-y-2">
+                    <h4 className="text-xs font-black text-saffron-950 uppercase tracking-widest font-display flex items-center justify-center gap-1.5">
+                      <span>Pratham Free Consult Complete</span>
+                    </h4>
+                    <p className="text-[11.5px] text-gray-700 leading-relaxed font-sans font-medium">
+                      Pujya devotee! Your complimentary 3-message consultation limit is reached. Unlock continuous Vedic wisdom and direct, offline 1-on-1 counselor guidance by offering a small respectful **Shradha Dakshina**.
                     </p>
+                    {/* Benefits lists */}
+                    <div className="grid grid-cols-2 gap-2 text-[10px] text-left max-w-xs mx-auto text-amber-950 font-bold pt-1">
+                      <div className="flex items-center gap-1">✨ Unlimited AI Chats</div>
+                      <div className="flex items-center gap-1">📞 15m Voice Helpline</div>
+                      <div className="flex items-center gap-1">🌌 Gothra & Grah Match</div>
+                      <div className="flex items-center gap-1">💮 Shubh Muhurats</div>
+                    </div>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-sm mx-auto pt-1">
+                  
+                  <div className="flex flex-row gap-3 justify-center max-w-sm mx-auto pt-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -1113,64 +1216,147 @@ export default function App() {
                           setIsConsultModalOpen(true);
                         }
                       }}
-                      className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-5 py-2.5 rounded-xl transition duration-150 text-xs shadow-md cursor-pointer uppercase tracking-wider flex-1 animate-pulse"
+                      className="bg-linear-to-r from-orange-600 to-saffron-600 hover:from-orange-700 hover:to-saffron-700 text-white font-black px-5 py-3 rounded-2xl transition duration-150 text-[11px] uppercase tracking-wider shadow-md hover:scale-102 flex-1 animate-pulse flex items-center justify-center gap-1.5"
                     >
-                      {previouslyPaidPandit ? `Renew Call & Chat (₹125)` : `Unlock Direct Pandit (₹251)`}
+                      <span>{previouslyPaidPandit ? `Renew Call & VIP Chat (₹125)` : `Unlock Direct Pandit (₹251)`}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setActiveTab('pujas')}
-                      className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-4 py-2.5 rounded-xl text-xs font-semibold cursor-pointer flex-1"
+                      className="bg-white border border-saffron-200 hover:bg-saffron-50 text-saffron-900 px-4 py-3 rounded-2xl text-[11px] font-bold cursor-pointer transition flex-1"
                     >
                       Pujas Catalog
                     </button>
                   </div>
-                  <p className="text-[10.5px] text-gray-400 font-medium">✨ This unlocks 24 Hours of direct text counseling and premium voice call service.</p>
+                  <p className="text-[10px] justify-center text-gray-400 font-bold tracking-wide">✨ Encrypted UPI & NetBanking Gateway • Standard 24h VIP consultation pass validity</p>
                 </div>
-              ) : (
-                <>
-                  {/* Prompt Helper Pills */}
-                  <div className="p-3 bg-saffron-50/50 border-t border-saffron-100 overflow-x-auto whitespace-nowrap flex items-center gap-2 text-xs no-scrollbar">
-                    <span className="text-gray-400 font-bold uppercase text-[9px] shrink-0">Ask Swami Ji:</span>
-                    {[
-                      "Which puja helps clear commercial business debts?",
-                      "Suggest a remedial mantra for recovering our sick elders",
-                      "What items are in standard Satyanarayan samagri kit?",
-                      "Can you check dynamic dates for Griha Pravesh home warmth?"
-                    ].map((pillText, i) => (
-                      <button
-                        key={i}
-                        onClick={() => triggerChatPill(pillText)}
-                        className="bg-white hover:bg-saffron-100 text-saffron-700 border border-saffron-150 px-3 py-1.5 rounded-full cursor-pointer transition duration-150 text-xs shadow-xs"
-                      >
-                        {pillText}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Chat Input form */}
-                  <form onSubmit={handleChatSubmit} className="p-3 border-t border-saffron-100 bg-white flex gap-2">
-                    <input
-                      id="chat-input-box"
-                      type="text"
-                      value={userChatInput}
-                      onChange={(e) => setUserChatInput(e.target.value)}
-                      placeholder={hasDirectPanditAccess ? `Type your premium direct query to ${settings.panditName || 'Shyam Guru ji'}...` : `Ask ${settings.panditName || 'Shyam Guru ji'} about Gothras, rituals, package options...`}
-                      className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-saffron-500 focus:border-transparent text-sm text-gray-800"
-                      disabled={chatLoading}
-                    />
-                    <button
-                      type="submit"
-                      className="bg-saffron-600 hover:bg-saffron-700 text-white font-bold px-5 py-2.5 rounded-xl transition duration-150 text-sm flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
-                      disabled={chatLoading || !userChatInput.trim()}
-                      id="send-chat-btn"
-                    >
-                      <span>{hasDirectPanditAccess ? "Verify & Speak" : "Sankalp Query"}</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </form>
-                </>
               )}
+
+              {/* Prompt Helper Pills */}
+              {userMsgsCount < 3 && (
+                <div className="p-3.5 bg-gradient-to-r from-saffron-50/40 via-white to-amber-50/40 border-t border-saffron-100 overflow-x-auto whitespace-nowrap flex items-center gap-2 text-xs no-scrollbar">
+                  <span className="text-gray-400 font-black uppercase text-[9px] tracking-wide shrink-0">Vedic Inquiries:</span>
+                  {[
+                    "Which puja helps clear commercial business debts?",
+                    "Suggest a remedial mantra for recovering our sick elders",
+                    "What items are in standard Satyanarayan samagri kit?",
+                    "Can you check dynamic dates for Griha Pravesh home warmth?"
+                  ].map((pillText, i) => (
+                    <button
+                      key={i}
+                      onClick={() => triggerChatPill(pillText)}
+                      className="bg-white hover:bg-saffron-50/70 text-saffron-850 hover:text-saffron-950 border border-saffron-150 rounded-full px-3 py-1.5 text-xs font-semibold cursor-pointer transition select-none hover:shadow-xs"
+                    >
+                      {pillText}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Attachment Previews or Loading states */}
+              {(chatAttachedImage || isUploadingChatImage || chatUploadError) && (
+                <div className="mx-3.5 mt-2 p-3 bg-amber-50/45 border border-saffron-150 rounded-xl flex items-center justify-between gap-3 text-xs animate-fadeIn">
+                  <div className="flex items-center gap-2.5">
+                    {chatAttachedImage && (
+                      <div className="relative w-12 h-12 rounded-lg border border-saffron-200 overflow-hidden bg-white shrink-0 shadow-xs">
+                        <img
+                          src={chatAttachedImage}
+                          alt="Upload preview"
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setChatAttachedImage(null);
+                            setChatAttachedImageMime(null);
+                          }}
+                          className="absolute -top-1 -right-1 bg-red-500 hover:bg-red-600 text-white rounded-full w-4.5 h-4.5 flex items-center justify-center text-[9px] font-black cursor-pointer shadow-xs"
+                          title="Remove attachment"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
+                    <div>
+                      {isUploadingChatImage && (
+                        <span className="text-saffron-600 font-extrabold animate-pulse block">
+                          ⏳ Uploading sacred attachment to server...
+                        </span>
+                      )}
+                      {chatAttachedImage && (
+                        <span className="text-emerald-700 font-bold block">
+                          ✓ Sacred photo attached successfully
+                        </span>
+                      )}
+                      {chatUploadError && (
+                        <span className="text-red-500 font-medium block">
+                          ⚠️ {chatUploadError}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {chatAttachedImage && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChatAttachedImage(null);
+                        setChatAttachedImageMime(null);
+                      }}
+                      className="text-[10px] text-red-500 hover:underline font-bold cursor-pointer uppercase tracking-wider"
+                    >
+                      Clear File
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Chat Input form (Always visible, disabled for standard users after 3 messages) */}
+              <form onSubmit={handleChatSubmit} className="p-3.5 border-t border-saffron-100 bg-white flex items-center gap-2.5">
+                {/* Paperclip file uploader input */}
+                <div className="relative shrink-0">
+                  <label 
+                    className={`w-11 h-11 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500 hover:text-saffron-750 hover:bg-saffron-50/55 cursor-pointer transition ${
+                      chatLoading || (userMsgsCount >= 3 && !hasDirectPanditAccess) ? 'opacity-50 cursor-not-allowed bg-gray-50' : ''
+                    }`}
+                    title="Attach horoscope, Kundli, drawing or photo"
+                  >
+                    <Paperclip className="w-5 h-5" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleChatImageUploadChange}
+                      className="hidden"
+                      disabled={chatLoading || (userMsgsCount >= 3 && !hasDirectPanditAccess)}
+                    />
+                  </label>
+                </div>
+
+                <input
+                  id="chat-input-box"
+                  type="text"
+                  value={userChatInput}
+                  onChange={(e) => setUserChatInput(e.target.value)}
+                  placeholder={
+                    userMsgsCount >= 3 && !hasDirectPanditAccess
+                      ? "Free trial ended. Offer respect Shradha Dakshina to continue."
+                      : hasDirectPanditAccess 
+                        ? `Type your sacred query to ${settings.panditName || 'Shyam Guru ji'}...` 
+                        : `Ask ${settings.panditName || 'Shyam Guru ji'} about planetary charts, photos, mantras...`
+                  }
+                  className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-saffron-500 focus:border-transparent text-sm text-gray-800 disabled:bg-gray-150 disabled:text-gray-400 disabled:cursor-not-allowed font-medium font-sans placeholder-gray-400"
+                  disabled={chatLoading || (userMsgsCount >= 3 && !hasDirectPanditAccess)}
+                />
+                
+                <button
+                  type="submit"
+                  className="bg-saffron-600 hover:bg-saffron-700 text-white font-black px-5 py-3 rounded-xl transition duration-150 text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer shadow-md disabled:bg-gray-200 disabled:text-gray-450 disabled:cursor-not-allowed shrink-0 h-11"
+                  disabled={chatLoading || !userChatInput.trim() || (userMsgsCount >= 3 && !hasDirectPanditAccess)}
+                  id="send-chat-btn"
+                >
+                  <span>{hasDirectPanditAccess ? "Ask Pandit" : "Send Sankalp"}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </form>
 
             </div>
           );
@@ -2510,7 +2696,7 @@ export default function App() {
                       setIsLoginModalOpen(false);
                       alert(`Pranam, ${matches.fullName}! Welcome to Pooja4Panditji.`);
                     } else {
-                      alert("Divine authentication mismatch. Check User ID & Password. (Hint: vikas.savita@smollan.com / password123)");
+                      alert("Divine authentication mismatch. Check User ID & Password. (Hint: vsvikash290@gmail.com / password123)");
                     }
                   }}
                   className="space-y-4"
@@ -2521,7 +2707,7 @@ export default function App() {
                       type="email"
                       required
                       name="loginId"
-                      placeholder="eg. vikas.savita@smollan.com"
+                      placeholder="eg. vsvikash290@gmail.com"
                       className="w-full px-3 py-2 border border-gray-250 rounded-lg focus:ring-1 focus:ring-saffron-500 focus:outline-none"
                     />
                   </div>
@@ -2545,7 +2731,7 @@ export default function App() {
 
                   <div className="text-center pt-2 text-[10.5px]">
                     <span className="text-gray-400">Default Devotee Log: </span>
-                    <strong className="text-saffron-700 font-mono">vikas.savita@smollan.com / password123</strong>
+                    <strong className="text-saffron-700 font-mono">vsvikash290@gmail.com / password123</strong>
                   </div>
                 </form>
               ) : (
@@ -2718,7 +2904,7 @@ export default function App() {
                       required 
                       value={consultFormPhone}
                       onChange={(e) => setConsultFormPhone(e.target.value)}
-                      placeholder="eg. +91 98851 XXXXX"
+                      placeholder="eg. +91 84450 XXXXX"
                       className="w-full px-2.5 py-1.5 border border-gray-255 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 text-xs"
                       id="consult-field-phone"
                     />

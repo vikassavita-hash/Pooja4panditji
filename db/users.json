@@ -1,9 +1,19 @@
 [
   {
+    "userId": "vsvikash290@gmail.com",
+    "passwordHash": "password123",
+    "fullName": "Vikas Savita",
+    "phone": "+91 84450 30767",
+    "email": "vsvikash290@gmail.com",
+    "gothra": "Bhardwaj",
+    "nakshatra": "Rohini",
+    "createdAt": "2026-05-18T10:00:00Z"
+  },
+  {
     "userId": "vikas.savita@smollan.com",
     "passwordHash": "password123",
     "fullName": "Vikas Savita",
-    "phone": "+91 98765 43210",
+    "phone": "+91 84450 30767",
     "email": "vikas.savita@smollan.com",
     "gothra": "Bhardwaj",
     "nakshatra": "Rohini",

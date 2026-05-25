@@ -23,7 +23,7 @@ export interface Puja {
   tagline: string;
   description: string;
   significance: string;
-  category: 'prosperity' | 'remedial' | 'milestones' | 'festivals' | 'peace';
+  category: 'prosperity' | 'remedial' | 'milestones' | 'festivals' | 'peace' | 'education' | 'ancestral';
    deity: string;
   rating: number;
   reviewCount: number;
@@ -69,6 +69,8 @@ export interface ChatMessage {
   sender: 'user' | 'pandit';
   text: string;
   timestamp: string;
+  attachedImageUrl?: string;
+  attachedImageMime?: string;
 }
 
 export interface PortalSettings {
@@ -89,6 +91,9 @@ export interface PortalSettings {
   showAdminPortalTab?: boolean;
   // Devotee Terms and Conditions
   devoteeTerms?: string;
+  // Dynamic Real Gmail SMTP Integrations
+  gmailAddress?: string;
+  googleAppPassword?: string;
 }
 
 export interface UserAccount {

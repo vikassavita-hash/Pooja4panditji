@@ -369,5 +369,115 @@ export const PUJAS_DATA: Puja[] = [
       { name: 'Copper Abhishek Lota (Kalash) & plate', quantity: '1 set', isMandatory: true, category: 'essential' },
       { name: 'Fresh Bel fruit and pomegranate offerings', quantity: '5 pieces', isMandatory: true, category: 'fresh' }
     ]
+  },
+  {
+    id: 'saraswati',
+    name: 'Maha Saraswati Vidya Puja',
+    sanskritName: 'महा सरस्वती पूजन एवं विद्या प्राप्ति',
+    tagline: 'Invoke the Goddess of wisdom, arts, and learning for memory, academic success, and cognitive shield.',
+    deity: 'Goddess Saraswati',
+    category: 'education',
+    description: 'A sacred Vedic ceremony dedicated to Maa Saraswati, the embodiment of wisdom, intellect, arts, and music. Ideal for students, researchers, teachers, and professionals seeking clarity of mind, speech, concentration, and success in exams or creative pursuits.',
+    significance: 'Enhances cognitive capacities, removes negative intellectual blocks, pacifies the mind, and blesses candidates with fluent articulation and absolute educational growth.',
+    rating: 4.96,
+    reviewCount: 142,
+    durationString: '2 Hours',
+    basePrice: 1800,
+    imageUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=600',
+    mantra: 'ॐ ऐं सरस्वत्यै नमः',
+    mantraMeaning: '"Om Aim Saraswatyai Namah" - Salutations to the Divine embodiment of knowledge and the subtle seed-sound Aim.',
+    packages: [
+      {
+        id: 'basic',
+        name: 'Vidya Aarambh Sankalp (E-Puja)',
+        price: 1800,
+        description: 'Interactive online Saraswati mantra initiation, study books blessing, and concentration prayers over HD live stream.',
+        benefits: [
+          'Live interactive session with pure Vedic pronunciation',
+          'Academic and career Sankalp with student Gothra',
+          'Saraswati Stotram chanting & study desk energization',
+          'Digital Mantra booklet and study guides'
+        ],
+        durationMinutes: 60,
+        includedSamagri: false,
+        dakshinaInclusions: ['Pandit Ji E-Dakshina', 'PDF Puja guide']
+      },
+      {
+        id: 'standard',
+        name: 'Gyaan Vardhan Home Puja (In-Person)',
+        price: 3600,
+        description: 'Physical ritual performed directly at your study room or residence by an expert certified Pandit Ji.',
+        benefits: [
+          'Certified Saraswati-upasak Pandit Ji visiting your home',
+          'White flower and yellow mustard offering pathways',
+          'Special Pen & Penholder blessing during Sankalpam',
+          'Complete Saraswati Puja samagri kit sent to your address'
+        ],
+        durationMinutes: 90,
+        includedSamagri: true,
+        dakshinaInclusions: ['Travel costs', 'Pandit Ji Dakshina', 'All standard puja items']
+      }
+    ],
+    samagriList: [
+      { name: 'Saraswati Yantra & Brass Idol', quantity: '1 Set', isMandatory: true, category: 'essential' },
+      { name: 'White & Yellow Flowers / Garlands', quantity: '1 Pack each', isMandatory: true, category: 'fresh' },
+      { name: 'Saffron (Kesar) & Yellow Chandan', quantity: '1 Box each', isMandatory: true, category: 'essential' },
+      { name: 'Holy Pen & Sacred Saraswati Thread', quantity: '2 Units', isMandatory: true, category: 'sacred' }
+    ]
+  },
+  {
+    id: 'pitrushradh',
+    name: 'Pitru Tarpan & Shradh Puja',
+    sanskritName: 'पितृ तर्पण एवं श्राद्ध शांति',
+    tagline: 'Express eternal files of gratitude and bring absolute liberation to departed ancestors.',
+    deity: 'Pitru Devata',
+    category: 'ancestral',
+    description: 'An essential high-fidelity lineage ritual performed to honor, express gratitude, and request blessings from departed souls. It pacifies structural Pitra Doshas in birth charts, bringing harmony, success, and protecting future generations with ancestral blessings.',
+    significance: 'Satisfies and heals the ancestral soul streams, bringing peace to the lineage, family unity, and dissolving persistent karmic blocks or delays.',
+    rating: 4.98,
+    reviewCount: 228,
+    durationString: '3 Hours',
+    basePrice: 3200,
+    imageUrl: 'https://images.unsplash.com/photo-1599819811279-d5ad9cccf838?auto=format&fit=crop&q=80&w=600',
+    mantra: 'ॐ पितृभ्यः स्वाहा',
+    mantraMeaning: '"Om Pitrubhyah Swaha" - Salutations and offerings of food & water to our auspicious ancestors.',
+    packages: [
+      {
+        id: 'basic',
+        name: 'Pitru Shanti Sankalp (E-Tarpan)',
+        price: 3250,
+        description: 'Expert Pandit guided remote line-by-line tarpana with your ancestral names & gotra recited with Vedic precision over Zoom.',
+        benefits: [
+          'Online personalized audio/video guidance',
+          'Comprehensive reading of 3 generations of ancestral names',
+          'Step-by-step instructions with black sesame and water offering',
+          'Pitra Gayatri mantra sheets'
+        ],
+        durationMinutes: 95,
+        includedSamagri: false,
+        dakshinaInclusions: ['Pandit Ji online service fee']
+      },
+      {
+        id: 'standard',
+        name: 'Holy Shradh & Pinda Daan (In-Person)',
+        price: 7200,
+        description: 'Veda-approved shradha ritual creating rice Pindas, black til offerings, and home environment realignments.',
+        benefits: [
+          'Senior priestly specialist visiting your home/local riverbank',
+          'Rice & black sesame Pinda creation and water tarpan paths',
+          'Blessings and purification of the kitchen area',
+          'Direct Courier delivery of premium custom Shradh materials'
+        ],
+        durationMinutes: 140,
+        includedSamagri: true,
+        dakshinaInclusions: ['Senior Pandit travel & fee', 'Rice flour, honey, kush grass, white threads, sesame grains']
+      }
+    ],
+    samagriList: [
+      { name: 'Kush Grass (Darbha variant for ancestors)', quantity: '1 Bundle', isMandatory: true, category: 'essential' },
+      { name: 'Black Sesame Seeds (Kala Til) and Barley grain', quantity: '500g', isMandatory: true, category: 'essential' },
+      { name: 'Rice Flour (for making Pindas)', quantity: '1 Kg', isMandatory: true, category: 'essential' },
+      { name: 'Ganga Jal, Milk and Honey', quantity: 'Assorted pots', isMandatory: true, category: 'fresh' }
+    ]
   }
 ];

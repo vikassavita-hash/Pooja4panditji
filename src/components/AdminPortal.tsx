@@ -26,7 +26,17 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
   const [errorMsg, setErrorMsg] = useState('');
 
   // Tab state inside admin dashboard
-  const [adminSubTab, setAdminSubTab] = useState<'bookings' | 'users' | 'catalog' | 'settings'>('bookings');
+  const [adminSubTab, setAdminSubTab] = useState<'bookings' | 'users' | 'catalog' | 'settings' | 'email_logs'>('bookings');
+  const [emailLogs, setEmailLogs] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (adminSubTab === 'email_logs') {
+      fetch('/api/email-logs')
+        .then(res => res.json())
+        .then(data => setEmailLogs(data))
+        .catch(err => console.error("Could not fetch email dispatch logs:", err));
+    }
+  }, [adminSubTab]);
 
   // Report Download CSV Generator systems
   const downloadBookingsCSV = () => {
@@ -109,6 +119,49 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
   const [customImageUrl, setCustomImageUrl] = useState('');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
+  // celestial photo upload states
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [uploadErrorMsg, setUploadErrorMsg] = useState('');
+
+  const performPhotoUpload = async (file: File): Promise<string> => {
+    setIsUploadingPhoto(true);
+    setUploadErrorMsg('');
+    try {
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Please select an actual image file.');
+      }
+      if (file.size > 20 * 1024 * 1024) { // 20 MB max
+        throw new Error('Image size exceeds 20MB limit.');
+      }
+
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (err) => reject(err);
+      });
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: file.name, base64 })
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        return data.url;
+      } else {
+        throw new Error(data.error || 'Upload failed');
+      }
+    } catch (err: any) {
+      console.error("Vedic uploader failure:", err);
+      const userErr = err.message || 'Failed to upload photo to the backend server.';
+      setUploadErrorMsg(userErr);
+      throw err;
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
   // Add listing state
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newPujaName, setNewPujaName] = useState('');
@@ -124,8 +177,8 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
   const [newPujaMantraMeaning, setNewPujaMantraMeaning] = useState('Salutations to the remover of absolute obstacles, Ganesha.');
 
   // Global settings local states synced with prop settings
-  const [localPhone, setLocalPhone] = useState(settings.contactPhone || '+91 98851 10082');
-  const [localWhatsapp, setLocalWhatsapp] = useState(settings.whatsappNumber || '+91 98851 10082');
+  const [localPhone, setLocalPhone] = useState(settings.contactPhone || '+91 84450 30767');
+  const [localWhatsapp, setLocalWhatsapp] = useState(settings.whatsappNumber || '+91 84450 30767');
   const [localApiKey, setLocalApiKey] = useState(settings.geminiApiKey || '');
   const [localUpiId, setLocalUpiId] = useState(settings.upiId || 'shastri.pandit108@okhdfcbank');
   const [localUpiQr, setLocalUpiQr] = useState(settings.upiQrUrl || '');
@@ -140,6 +193,9 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
   const [localShowAiPanditTab, setLocalShowAiPanditTab] = useState(settings.showAiPanditTab !== false);
   const [localShowMyBookingsTab, setLocalShowMyBookingsTab] = useState(settings.showMyBookingsTab !== false);
   const [localShowAdminPortalTab, setLocalShowAdminPortalTab] = useState(settings.showAdminPortalTab !== false);
+
+  const [localGmailAddress, setLocalGmailAddress] = useState(settings.gmailAddress || 'vsvikash290@gmail.com');
+  const [localGoogleAppPassword, setLocalGoogleAppPassword] = useState(settings.googleAppPassword || '');
 
   const [settingsSuccessMsg, setSettingsSuccessMsg] = useState('');
 
@@ -325,8 +381,8 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
   const handleSaveGlobalSettings = (e: React.FormEvent) => {
     e.preventDefault();
     const updatedSettings: PortalSettings = {
-      contactPhone: localPhone || '+91 98851 10082',
-      whatsappNumber: localWhatsapp || '+91 98851 10082',
+      contactPhone: localPhone || '+91 84450 30767',
+      whatsappNumber: localWhatsapp || '+91 84450 30767',
       geminiApiKey: localApiKey || '',
       upiId: localUpiId || 'shastri.pandit108@okhdfcbank',
       upiQrUrl: localUpiQr || '',
@@ -338,12 +394,14 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
       showExplorePujasTab: localShowExplorePujasTab,
       showAiPanditTab: localShowAiPanditTab,
       showMyBookingsTab: localShowMyBookingsTab,
-      showAdminPortalTab: localShowAdminPortalTab
+      showAdminPortalTab: localShowAdminPortalTab,
+      gmailAddress: localGmailAddress,
+      googleAppPassword: localGoogleAppPassword
     };
     setSettings(updatedSettings);
     // Write back to localstorage immediately
     localStorage.setItem('pooja4panditji_portal_settings', JSON.stringify(updatedSettings));
-    setSettingsSuccessMsg('ॐ Shanti! Global support helpline, WhatsApp details, Pandit certified profile, and tab configurations updated successfully.');
+    setSettingsSuccessMsg('ॐ Shanti! Global support helpline, SMTP dynamic Gmail dispatcher credentials, Pandit certified profile, and tab configurations updated successfully.');
     setTimeout(() => setSettingsSuccessMsg(''), 5000);
   };
 
@@ -572,6 +630,18 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
           id="admin-tab-settings"
         >
           Global Devotion Settings
+        </button>
+
+        <button
+          onClick={() => setAdminSubTab('email_logs')}
+          className={`pb-2.5 px-4 text-xs tracking-wider uppercase transition-all duration-200 cursor-pointer ${
+            adminSubTab === 'email_logs'
+              ? 'text-saffron-700 font-extrabold border-b-2 border-saffron-600'
+              : 'text-gray-500 hover:text-saffron-600'
+          }`}
+          id="admin-tab-emaillogs"
+        >
+          ✉️ Email dispatch logs
         </button>
       </div>
 
@@ -1012,6 +1082,39 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                       onChange={(e) => setNewPujaImage(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 font-mono"
                     />
+
+                    {/* Backend File Upload Interface */}
+                    <div className="mt-2 p-3 bg-amber-50/30 rounded-xl border border-amber-200/50 space-y-2">
+                      <span className="text-[10px] text-amber-950 font-black tracking-wider uppercase block">
+                        📤 Or Upload New Photo to Server Backend:
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            try {
+                              const uploadedUrl = await performPhotoUpload(file);
+                              setNewPujaImage(uploadedUrl);
+                            } catch (err) {}
+                          }
+                        }}
+                        className="block w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-[11px] file:font-extrabold file:bg-linear-to-r file:from-saffron-500 file:to-amber-500 file:text-white hover:file:opacity-90 cursor-pointer"
+                      />
+                      {isUploadingPhoto && (
+                        <p className="text-[10px] text-saffron-600 font-bold animate-pulse flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-saffron-500 animate-ping"></span>
+                          <span>Uploading celestial picture to server...</span>
+                        </p>
+                      )}
+                      {uploadErrorMsg && (
+                        <p className="text-[10px] text-red-650 font-medium">
+                          ⚠️ {uploadErrorMsg}
+                        </p>
+                      )}
+                    </div>
+
                     <div className="pt-1.5 flex gap-2 overflow-x-auto pb-1">
                       {SACRED_IMAGE_PRESETS.map((preset, idx) => (
                         <button
@@ -1117,6 +1220,38 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                       placeholder="Enter photo link URL (https://...)"
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-saffron-500 focus:outline-none"
                     />
+
+                    {/* Backend File Upload Interface */}
+                    <div className="mt-2.5 p-3.5 bg-amber-50/30 rounded-xl border border-amber-200/50 space-y-2">
+                      <span className="text-[10px] text-amber-950 font-black tracking-wider uppercase block">
+                        📤 Direct Photo Upload to Backend Server:
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            try {
+                              const uploadedUrl = await performPhotoUpload(file);
+                              setCustomImageUrl(uploadedUrl);
+                            } catch (err) {}
+                          }
+                        }}
+                        className="block w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-[11px] file:font-extrabold file:bg-linear-to-r file:from-saffron-500 file:to-amber-500 file:text-white hover:file:opacity-90 cursor-pointer"
+                      />
+                      {isUploadingPhoto && (
+                        <p className="text-[10px] text-saffron-600 font-bold animate-pulse flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-saffron-500 animate-ping"></span>
+                          <span>Uploading celestial picture to server...</span>
+                        </p>
+                      )}
+                      {uploadErrorMsg && (
+                        <p className="text-[10px] text-red-650 font-medium">
+                          ⚠️ {uploadErrorMsg}
+                        </p>
+                      )}
+                    </div>
 
                     {/* Highly Devotional Visual Presets selector */}
                     <div className="pt-2">
@@ -1303,7 +1438,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                     required
                     value={localPhone}
                     onChange={(e) => setLocalPhone(e.target.value)}
-                    placeholder="eg. +91 98851 10082"
+                    placeholder="eg. +91 84450 30767"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 font-mono font-semibold"
                   />
                   <p className="text-[10px] text-gray-400">Displayed in main page navigation bar support section.</p>
@@ -1316,7 +1451,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                     required
                     value={localWhatsapp}
                     onChange={(e) => setLocalWhatsapp(e.target.value)}
-                    placeholder="eg. +91 98851 10082"
+                    placeholder="eg. +91 84450 30767"
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 font-mono font-semibold"
                   />
                   <p className="text-[10px] text-gray-400">Coordinates will open a direct WhatsApp chat on click.</p>
@@ -1343,6 +1478,46 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                 <p className="text-[10px] text-gray-400 leading-relaxed">
                   Provide an optional personal `GEMINI_API_KEY` to substitute server-side default parameters. Allows fully custom Vedic answers in online Pandit Chat interactions.
                 </p>
+              </div>
+            </div>
+
+            {/* Real Gmail Dispatcher SMTP Gateway */}
+            <div className="bg-saffron-50/15 border border-saffron-100/60 p-4 rounded-xl space-y-4">
+              <h5 className="font-bold text-saffron-900 uppercase tracking-wider text-[10px] flex items-center gap-2 border-b border-saffron-100 pb-2">
+                <span>✉️</span>
+                <span>Real Gmail SMTP Divine Transmission Gateway</span>
+              </h5>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-semibold text-gray-650">Devotee Sender Gmail Address</label>
+                  <input
+                    type="email"
+                    required
+                    value={localGmailAddress}
+                    onChange={(e) => setLocalGmailAddress(e.target.value)}
+                    placeholder="eg. vsvikash290@gmail.com"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 font-mono font-medium text-gray-800"
+                  />
+                  <p className="text-[10px] text-gray-400">The Gmail account from which devotee confirmations & admin records will be sent.</p>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-semibold text-gray-655 flex items-center gap-1.5">
+                    <span>Google App Password</span>
+                    <span className="text-[9px] text-amber-600 bg-amber-50 border border-amber-200 px-1 rounded">Secure</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={localGoogleAppPassword}
+                    onChange={(e) => setLocalGoogleAppPassword(e.target.value)}
+                    placeholder="Enter 16-character Google App Password (no spaces)"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 font-mono"
+                  />
+                  <p className="text-[10px] text-gray-400 leading-normal">
+                    Do not use your main Google login password! Enable 2-Step Verification in Google Account, go to Security, generate a 16-letter "App Password" (e.g., `abcd efgh ijkl mnop`), and paste it here.
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -1539,6 +1714,62 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
 
           </form>
 
+        </div>
+      )}
+
+      {adminSubTab === 'email_logs' && (
+        <div className="bg-white rounded-xl border border-saffron-100 shadow-md p-5 sm:p-6 animate-fadeIn space-y-6 max-w-4xl">
+          <div className="border-b border-gray-150 pb-4">
+            <h4 className="text-base font-extrabold text-gray-900 font-display flex items-center gap-2">
+              <span>✉️</span>
+              <span>Divine Email Dispatch & Booking Alerts Ledger</span>
+            </h4>
+            <p className="text-xs text-gray-500 mt-1">Live tracking of triggered emails sent to devotees and admin (vsvikash290@gmail.com) for real-time confirmation audit.</p>
+          </div>
+
+          <div className="space-y-4">
+            {emailLogs.length === 0 ? (
+              <div className="text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                <span className="text-3xl block mb-2">📨</span>
+                <p className="text-sm text-gray-500 font-medium">No emails have been dispatched in this session yet.</p>
+                <p className="text-xs text-gray-400 mt-1">Make a test puja booking or confirm any booking to trigger live email logs!</p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                {emailLogs.map((log: any) => (
+                  <div key={log.id} className="border border-saffron-100 rounded-xl bg-saffron-50/15 p-4 space-y-2.5 hover:border-saffron-200 transition">
+                    <div className="flex flex-wrap justify-between items-start gap-2 border-b border-saffron-100/50 pb-2">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-saffron-600 block">TRANSACTION LOG ID</span>
+                        <span className="font-mono text-xs font-bold text-gray-800">{log.id}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 block">TIMESTAMP</span>
+                        <span className="text-xs font-medium text-gray-600">{new Date(log.timestamp).toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <p><strong className="text-gray-500">From:</strong> <span className="font-mono text-gray-700 bg-white px-1.5 py-0.5 rounded border border-gray-100">{log.from}</span></p>
+                      <p><strong className="text-gray-500">To:</strong> <span className="font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 font-bold">{log.to}</span></p>
+                    </div>
+
+                    <div className="text-xs">
+                      <p><strong className="text-gray-500">Subject:</strong> <span className="font-semibold text-gray-800">{log.subject}</span></p>
+                    </div>
+
+                    <div className="mt-2">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-gray-400 block mb-1">Live Email Content Preview</span>
+                      <div 
+                        className="bg-white p-3.5 rounded-lg border border-gray-200 text-xs text-gray-700 max-h-[150px] overflow-y-auto font-sans leading-relaxed shadow-sm scale-95 origin-top-left"
+                        dangerouslySetInnerHTML={{ __html: log.html || '' }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

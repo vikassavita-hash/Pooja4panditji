@@ -4,74 +4,31 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
-import mysql from "mysql2/promise";
+import nodemailer from "nodemailer";
 import { PUJAS_DATA } from "./src/data/pujas";
 
 dotenv.config();
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 const PORT = 3000;
 
-const MYSQL_ENABLED = !!process.env.MYSQL_HOST && !!process.env.MYSQL_USER && !!process.env.MYSQL_DATABASE;
-let mysqlPool: mysql.Pool | null = null;
-
-async function initMySqlPool() {
-  if (!MYSQL_ENABLED) {
-    return;
-  }
-
-  if (mysqlPool) {
-    return;
-  }
-
-  mysqlPool = await mysql.createPool({
-    host: process.env.MYSQL_HOST,
-    port: process.env.MYSQL_PORT ? parseInt(process.env.MYSQL_PORT, 10) : 3306,
-    user: process.env.MYSQL_USER,
-    password: process.env.MYSQL_PASSWORD,
-    database: process.env.MYSQL_DATABASE,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-  });
-
-  await mysqlPool.query(`
-    CREATE TABLE IF NOT EXISTS json_store (
-      collection VARCHAR(100) PRIMARY KEY,
-      data LONGTEXT NOT NULL,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
-  `);
+// Setup persistent JSON file-based database
+const DB_DIR = path.join(process.cwd(), "db");
+if (!fs.existsSync(DB_DIR)) {
+  fs.mkdirSync(DB_DIR, { recursive: true });
 }
 
-function getTableName(filename: string) {
-  return path.basename(filename, path.extname(filename));
+// Setup dedicated uploads folder inside public-accessible database directory
+const UPLOADS_DIR = path.join(DB_DIR, "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
+app.use("/uploads", express.static(UPLOADS_DIR));
 
-async function readDbFile(filename: string, defaultValue: any) {
-  if (MYSQL_ENABLED) {
-    try {
-      await initMySqlPool();
-      const tableName = getTableName(filename);
-      const [rows] = await mysqlPool!.query<any[]>(
-        `SELECT data FROM json_store WHERE collection = ? LIMIT 1`,
-        [tableName]
-      );
-      if (rows.length > 0 && rows[0].data) {
-        return JSON.parse(rows[0].data);
-      }
-      await mysqlPool!.query(
-        `INSERT INTO json_store (collection, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)`,
-        [tableName, JSON.stringify(defaultValue)]
-      );
-      return defaultValue;
-    } catch (err) {
-      console.error(`MySQL read fallback error for ${filename}:`, err);
-    }
-  }
-
-  const filePath = path.join(process.cwd(), "db", filename);
+function readDbFile(filename: string, defaultValue: any) {
+  const filePath = path.join(DB_DIR, filename);
   if (!fs.existsSync(filePath)) {
     try {
       fs.writeFileSync(filePath, JSON.stringify(defaultValue, null, 2), "utf8");
@@ -89,22 +46,8 @@ async function readDbFile(filename: string, defaultValue: any) {
   }
 }
 
-async function writeDbFile(filename: string, data: any) {
-  if (MYSQL_ENABLED) {
-    try {
-      await initMySqlPool();
-      const tableName = getTableName(filename);
-      await mysqlPool!.query(
-        `INSERT INTO json_store (collection, data) VALUES (?, ?) ON DUPLICATE KEY UPDATE data = VALUES(data)`,
-        [tableName, JSON.stringify(data)]
-      );
-      return;
-    } catch (err) {
-      console.error(`MySQL write fallback error for ${filename}:`, err);
-    }
-  }
-
-  const filePath = path.join(process.cwd(), "db", filename);
+function writeDbFile(filename: string, data: any) {
+  const filePath = path.join(DB_DIR, filename);
   try {
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
   } catch (err) {
@@ -112,9 +55,212 @@ async function writeDbFile(filename: string, data: any) {
   }
 }
 
-const DB_DIR = path.join(process.cwd(), "db");
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
+// NodeMailer Divine Email Notification Engine
+function getEmailTransporter(settings: any) {
+  const customGmail = settings?.gmailAddress;
+  const customPass = settings?.googleAppPassword;
+
+  // Real SMTP config prioritizing user's customized Gmail + App Password in Admin Portal settings
+  if (customGmail && customPass) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: customGmail,
+        pass: customPass
+      }
+    });
+  }
+
+  // Fallback to Env variables if defined
+  const host = process.env.SMTP_HOST || "";
+  const port = parseInt(process.env.SMTP_PORT || "587");
+  const user = process.env.SMTP_USER || "";
+  const pass = process.env.SMTP_PASS || "";
+
+  if (host && user && pass) {
+    return nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass }
+    });
+  }
+
+  // Virtual Dev-mode simulated transporter fallback
+  return {
+    sendMail: async (mailOptions: any) => {
+      console.log("================= SIMULATED OUTGOING EMAIL DISPATCH ================= ");
+      console.log(`FROM: ${mailOptions.from}`);
+      console.log(`TO: ${mailOptions.to}`);
+      console.log(`SUBJECT: ${mailOptions.subject}`);
+      console.log(`HTML BODY LENGTH: ${mailOptions.html?.length || 0} characters`);
+      console.log("=================================================================== ");
+      return { messageId: `SIM-MSG-${Date.now()}` };
+    }
+  };
+}
+
+async function sendBookingConfirmationEmails(booking: any) {
+  const defaults = {
+    contactPhone: '+91 84450 30767',
+    whatsappNumber: '+91 84450 30767',
+    geminiApiKey: '',
+    upiId: 'shastri.pandit108@okhdfcbank',
+    upiQrUrl: '',
+    panditName: 'Shyam Guru ji',
+    panditCertification: 'Certified by Mathura Vedic Board',
+    panditBio: 'Renowned scholar of Astro-Vedic rituals and Yajnas, directly descended from traditional priestly line of Mathura. Specialist in dynamic Kundali matchmaking and Shubh Muhurat determinations.',
+    showExplorePujasTab: true,
+    showAiPanditTab: true,
+    showMyBookingsTab: true,
+    showAdminPortalTab: true,
+    devoteeTerms: '1. All devotion services (Shradha Dakshina) are verified secure.\n2. The simulated handshakes are for instructional, direct, offline and virtual connect.\n3. By booking any puja, the devotee agrees to provide accurate Birth coordinates, Gothra and Nakshatra.\n4. Standard 24 Hours validity applies to digital chatbot and voice consult channels.\n5. Vedic rituals represent deep lineage devotion.',
+    gmailAddress: 'vsvikash290@gmail.com',
+    googleAppPassword: ''
+  };
+  
+  const settings = readDbFile("settings.json", defaults);
+  const senderEmail = settings.gmailAddress || 'shri.panditji.vedas@gmail.com';
+
+  try {
+    const tx = getEmailTransporter(settings);
+    
+    // 1. Admin Email (to vsvikash290@gmail.com)
+    const adminMailOptions = {
+      from: `"Pooja4Panditji Divine Portal" <${senderEmail}>`,
+      to: 'vsvikash290@gmail.com',
+      subject: `🕉️ [Admin Alert] Divine Puja Booked! ID: ${booking.id} - ${booking.customerName}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ffedd5; border-radius: 12px; background-color: #fffaf0;">
+          <h2 style="color: #ea580c; text-align: center; border-bottom: 2px solid #ffedd5; padding-bottom: 10px;">Divine Yajna Booking - Admin Console</h2>
+          <p style="font-size: 14px; color: #4b5563;">Pranam Shastri Ji, a new auspicious Puja session has been confirmed on the portal. Please note the devotee birth charts and parameters below:</p>
+          
+          <div style="background-color: #ffffff; padding: 15px; border-radius: 8px; border-left: 4px solid #ea580c; margin: 15px 0;">
+            <p style="margin: 4px 0; font-size: 13.5px;"><strong>Booking ID:</strong> ${booking.id}</p>
+            <p style="margin: 4px 0; font-size: 13.5px;"><strong>Auspicious Service:</strong> ${booking.pujaName}</p>
+            <p style="margin: 4px 0; font-size: 13.5px;"><strong>Package Chosen:</strong> ${booking.packageName || 'Standard'} (₹${booking.price})</p>
+            <p style="margin: 4px 0; font-size: 13.5px;"><strong>Auspicious Date/Time:</strong> ${new Date(booking.dateTime).toLocaleString()}</p>
+          </div>
+
+          <h3 style="color: #ea580c; font-size: 15px; margin-top: 20px;">Devotee Birth Details (Kundali Coordinates)</h3>
+          <table style="width: 100%; font-size: 13px; text-align: left; border-collapse: collapse; margin-top: 5px;">
+            <tr><th style="padding: 6px; border-bottom: 1px solid #f1f5f9;">Devotee Name</th><td style="padding: 6px; border-bottom: 1px solid #f1f5f9;">${booking.customerName}</td></tr>
+            <tr><th style="padding: 6px; border-bottom: 1px solid #f1f5f9;">Primary Email</th><td style="padding: 6px; border-bottom: 1px solid #f1f5f9;">${booking.customerEmail}</td></tr>
+            <tr><th style="padding: 6px; border-bottom: 1px solid #f1f5f9;">Primary Mobile</th><td style="padding: 6px; border-bottom: 1px solid #f1f5f9;">${booking.customerPhone}</td></tr>
+            <tr><th style="padding: 6px; border-bottom: 1px solid #f1f5f9;">Gotra (Clan)</th><td style="padding: 6px; border-bottom: 1px solid #f1f5f9;">${booking.gothra || 'Kashyap (Default)'}</td></tr>
+            <tr><th style="padding: 6px; border-bottom: 1px solid #f1f5f9;">Nakshatra (Moon-sign)</th><td style="padding: 6px; border-bottom: 1px solid #f1f5f9;">${booking.nakshatra || 'Anuradha (Default)'}</td></tr>
+            <tr><th style="padding: 6px; border-bottom: 1px solid #f1f5f9;">Sankalp Names</th><td style="padding: 6px; border-bottom: 1px solid #f1f5f9;">${booking.sankalpNames || booking.customerName}</td></tr>
+            <tr><th style="padding: 6px; border-bottom: 1px solid #f1f5f9;">Puja Mode</th><td style="padding: 6px; border-bottom: 1px solid #f1f5f9;">${booking.mode === 'e-puja' ? 'E-Puja (Online Video Broadcast)' : 'In-Person Temple Yajna'}</td></tr>
+            <tr><th style="padding: 6px; border-bottom: 1px solid #f1f5f9;">Samagri Kit</th><td style="padding: 6px; border-bottom: 1px solid #f1f5f9;">${booking.includeSamagriKit ? 'Yes (Deliver to Home Address)' : 'No'}</td></tr>
+          </table>
+
+          ${booking.notes ? `
+          <div style="background-color: #f8fafc; padding: 12px; border-radius: 8px; margin-top: 15px; font-size: 13px; color: #64748b;">
+            <strong>Devotee Prayer/Notes:</strong> "${booking.notes}"
+          </div>` : ''}
+
+          <div style="margin-top: 25px; font-size: 12px; color: #94a3b8; text-align: center;">
+            This administrative message is dispatched automatically from your Pooja4Panditji server.
+          </div>
+        </div>
+      `
+    };
+
+    // 2. Devotee Receipt Email
+    const devoteeMailOptions = {
+      from: `"Pooja4Panditji Divine Dispatch" <${senderEmail}>`,
+      to: booking.customerEmail,
+      subject: `🕉️ Your Holy Booking is Confirmed! Service: ${booking.pujaName} 🕉️`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; border: 2px solid #ea580c; border-radius: 16px; background-color: #fffcf8;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <span style="font-size: 40px;">🕉️</span>
+            <h1 style="color: #c2410c; margin: 4px 0 2px 0; font-family: Georgia, serif;">Hari Om, Devotee</h1>
+            <p style="color: #ea580c; font-style: italic; font-size: 13px; margin: 0;">Blessed Greetings from Pooja4Panditji</p>
+          </div>
+
+          <p style="font-size: 14.5px; color: #4338ca; line-height: 1.6; text-align: center;">
+            Pranam <strong>${booking.customerName}</strong>! We are honored to confirm that your booking for the holy <strong>${booking.pujaName}</strong> is successfully locked and certified.
+          </p>
+
+          <div style="background-color: #ffffff; padding: 20px; border-radius: 12px; border: 1px solid #ffedd5; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin: 20px 0;">
+            <p style="margin: 6px 0; font-size: 14px; color: #374151;"><strong>Divine Token ID:</strong> <span style="font-family: monospace; color: #c2410c; font-weight: bold;">${booking.id}</span></p>
+            <p style="margin: 6px 0; font-size: 14px; color: #374151;"><strong>Auspicious Puja:</strong> ${booking.pujaName}</p>
+            <p style="margin: 6px 0; font-size: 14px; color: #374151;"><strong>Altar Layout Package:</strong> ${booking.packageName || 'Standard'}</p>
+            <p style="margin: 6px 0; font-size: 14px; color: #374151;"><strong>Divine Price Dakshina:</strong> ₹${booking.price}</p>
+            <p style="margin: 6px 0; font-size: 14px; color: #374151;"><strong>Scheduled Muhurat Time:</strong> ${new Date(booking.dateTime).toLocaleString()}</p>
+            <p style="margin: 6px 0; font-size: 14px; color: #374151;"><strong>Astrological Gotra:</strong> ${booking.gothra || 'Kashyap (Default)'}</p>
+          </div>
+
+          <p style="font-size: 13.5px; color: #4b5563; line-height: 1.5;">
+            Our head Shastri, <strong>Shyam Guru ji</strong>, will prepare your personalized Sankalp ritual using your coordinates. If you chose e-Puja, you will receive your live stream video broadcast details on WhatsApp or email prior to the muhurat.
+          </p>
+
+          <div style="background-color: #fef3c7; border: 1px solid #fde68a; padding: 15px; border-radius: 10px; text-align: center; margin-top: 25px;">
+            <h4 style="margin: 0 0 5px 0; color: #b45309; font-size: 13px;">📞 Need Urgent Assistance or Birth Chart Matching?</h4>
+            <p style="margin: 0; font-size: 12.5px; color: #78350f;">
+              Talk directly with Pandit Ji's helpdesk over Phone or WhatsApp at <strong>+91 84450 30767</strong>.
+            </p>
+          </div>
+
+          <p style="font-size: 12px; color: #9ca3af; text-align: center; margin-top: 30px; border-top: 1px solid #e5e7eb; padding-top: 15px;">
+            May the supreme divine forces bring absolute prosperity, longevity, and peace to your family.<br>
+            <strong>🕉️ Har Har Mahadev 🕉️</strong>
+          </p>
+        </div>
+      `
+    };
+
+    const adminRes = await tx.sendMail(adminMailOptions);
+    const devoteeRes = await tx.sendMail(devoteeMailOptions);
+
+    const logFile = "email_logs.json";
+    const existingLogs = readDbFile(logFile, []);
+    
+    const logsToAdd = [
+      {
+        id: `EMAIL-ADM-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        timestamp: new Date().toISOString(),
+        from: adminMailOptions.from,
+        to: adminMailOptions.to,
+        subject: adminMailOptions.subject,
+        html: adminMailOptions.html,
+        status: adminRes?.messageId ? `Sent via SMTP (id: ${adminRes.messageId})` : "Simulated/Dispatched (Vedic channel check)"
+      },
+      {
+        id: `EMAIL-DEV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        timestamp: new Date().toISOString(),
+        from: devoteeMailOptions.from,
+        to: devoteeMailOptions.to,
+        subject: devoteeMailOptions.subject,
+        html: devoteeMailOptions.html,
+        status: devoteeRes?.messageId ? `Sent via SMTP (id: ${devoteeRes.messageId})` : "Simulated/Dispatched (Vedic channel check)"
+      }
+    ];
+
+    existingLogs.unshift(...logsToAdd);
+    writeDbFile(logFile, existingLogs);
+
+  } catch (err: any) {
+    console.error("[Email Engine] Failed to dispatch booking emails:", err);
+    
+    // Save SMTP transmission error details into the email ledger
+    const logFile = "email_logs.json";
+    const existingLogs = readDbFile(logFile, []);
+    existingLogs.unshift({
+      id: `EMAIL-ERR-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      from: senderEmail,
+      to: `${booking.customerEmail} & vsvikash290@gmail.com`,
+      subject: `⚠️ FAILURE: ${booking.pujaName} Email Transmission`,
+      html: `<div style="color: #991b1b; padding: 15px; border: 1px solid #fee2e2; border-radius: 8px; background-color: #fef2f2; font-family: monospace;">
+        <strong>Gmail / Google App Password Auth Failed:</strong><br>${err.message || err}<br><br>
+        <strong>Hint:</strong> Please verify in "Global Devotion Settings" if your Gmail Address matches perfectly and your Google App Password (16 characters from google security account) matches perfectly without spaces.
+      </div>`,
+      status: `Failed: ${err.message || 'Unknown SMTP error'}`
+    });
+    writeDbFile(logFile, existingLogs);
+  }
 }
 
 // Safe Lazy Initialization for Google GenAI on the secure server side
@@ -163,10 +309,10 @@ app.get("/api/health", (req, res) => {
 });
 
 // Settings REST APIs
-app.get("/api/settings", async (req, res) => {
+app.get("/api/settings", (req, res) => {
   const defaults = {
-    contactPhone: '+91 98851 10082',
-    whatsappNumber: '+91 98851 10082',
+    contactPhone: '+91 84450 30767',
+    whatsappNumber: '+91 84450 30767',
     geminiApiKey: '',
     upiId: 'shastri.pandit108@okhdfcbank',
     upiQrUrl: '',
@@ -179,33 +325,61 @@ app.get("/api/settings", async (req, res) => {
     showAdminPortalTab: true,
     devoteeTerms: '1. All devotion services (Shradha Dakshina) are verified secure.\n2. The simulated handshakes are for instructional, direct, offline and virtual connect.\n3. By booking any puja, the devotee agrees to provide accurate Birth coordinates, Gothra and Nakshatra.\n4. Standard 24 Hours validity applies to digital chatbot and voice consult channels.\n5. Vedic rituals represent deep lineage devotion.'
   };
-  const settings = await readDbFile("settings.json", defaults);
+  const settings = readDbFile("settings.json", defaults);
   res.json(settings);
 });
 
-app.post("/api/settings", async (req, res) => {
+app.post("/api/settings", (req, res) => {
   const newSettings = req.body;
-  await writeDbFile("settings.json", newSettings);
+  writeDbFile("settings.json", newSettings);
   res.json({ success: true, settings: newSettings });
 });
 
+// Dynamic Divine Photo Attachment Gateway
+app.post("/api/upload", (req, res) => {
+  const { filename, base64 } = req.body;
+  if (!filename || !base64) {
+    return res.status(400).json({ error: "Missing filename or base64 photo payload." });
+  }
+
+  try {
+    let pureBase64 = base64;
+    if (base64.includes(";base64,")) {
+      pureBase64 = base64.split(";base64,").pop() || "";
+    }
+
+    // Clean filename and make it unique with timestamp to prevent collisions
+    const safeName = `${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+    const targetPath = path.join(UPLOADS_DIR, safeName);
+
+    fs.writeFileSync(targetPath, Buffer.from(pureBase64, "base64"));
+    console.log(`[Vedic Storage] Saved uploaded photo: ${safeName}`);
+
+    // Return the relative public URL path
+    res.json({ success: true, url: `/uploads/${safeName}` });
+  } catch (err: any) {
+    console.error("Failed to save uploaded image asset:", err);
+    res.status(500).json({ error: "Failed to persist dynamic asset binary on the shrine host." });
+  }
+});
+
 // Catalog Pujas REST APIs
-app.get("/api/pujas", async (req, res) => {
-  const pujas = await readDbFile("pujas.json", PUJAS_DATA);
+app.get("/api/pujas", (req, res) => {
+  const pujas = readDbFile("pujas.json", PUJAS_DATA);
   res.json(pujas);
 });
 
-app.post("/api/pujas", async (req, res) => {
+app.post("/api/pujas", (req, res) => {
   const newPujas = req.body;
   if (!Array.isArray(newPujas)) {
     return res.status(400).json({ error: "Catalog must be an array." });
   }
-  await writeDbFile("pujas.json", newPujas);
+  writeDbFile("pujas.json", newPujas);
   res.json({ success: true, pujas: newPujas });
 });
 
 // Bookings REST APIs
-app.get("/api/bookings", async (req, res) => {
+app.get("/api/bookings", (req, res) => {
   const defaults = [
     {
       id: 'BKG-9843-VEDA',
@@ -234,43 +408,75 @@ app.get("/api/bookings", async (req, res) => {
       notes: "Please pray for my mother's speedy recovery."
     }
   ];
-  const bookings = await readDbFile("bookings.json", defaults);
+  const bookings = readDbFile("bookings.json", defaults);
   res.json(bookings);
 });
 
-app.post("/api/bookings", async (req, res) => {
+app.post("/api/bookings", (req, res) => {
   const newBookings = req.body;
   if (!Array.isArray(newBookings)) {
     return res.status(400).json({ error: "Bookings must be an array." });
   }
-  await writeDbFile("bookings.json", newBookings);
+
+  // Handle email triggers for newly confirmed bookings
+  try {
+    const previousBookings = readDbFile("bookings.json", []);
+    for (const b of newBookings) {
+      if (b.status === 'confirmed') {
+        const wasAlreadyConfirmed = previousBookings.some((prev: any) => prev.id === b.id && prev.status === 'confirmed');
+        if (!wasAlreadyConfirmed) {
+          sendBookingConfirmationEmails(b);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Error checking bookings for email dispatches:", err);
+  }
+
+  writeDbFile("bookings.json", newBookings);
   res.json({ success: true, bookings: newBookings });
 });
 
+// Email dispatch logs endpoint for admin verification
+app.get("/api/email-logs", (req, res) => {
+  const logs = readDbFile("email_logs.json", []);
+  res.json(logs);
+});
+
 // Users REST APIs
-app.get("/api/users", async (req, res) => {
+app.get("/api/users", (req, res) => {
   const defaults = [
+    {
+      userId: 'vsvikash290@gmail.com',
+      passwordHash: 'password123',
+      fullName: 'Vikas Savita',
+      phone: '+91 84450 30767',
+      email: 'vsvikash290@gmail.com',
+      gothra: 'Bhardwaj',
+      nakshatra: 'Rohini',
+      createdAt: '2026-05-18T10:00:00Z'
+    },
     {
       userId: 'vikas.savita@smollan.com',
       passwordHash: 'password123',
       fullName: 'Vikas Savita',
-      phone: '+91 98765 43210',
+      phone: '+91 84450 30767',
       email: 'vikas.savita@smollan.com',
       gothra: 'Bhardwaj',
       nakshatra: 'Rohini',
       createdAt: '2026-05-18T10:00:00Z'
     }
   ];
-  const users = await readDbFile("users.json", defaults);
+  const users = readDbFile("users.json", defaults);
   res.json(users);
 });
 
-app.post("/api/users", async (req, res) => {
+app.post("/api/users", (req, res) => {
   const newUsers = req.body;
   if (!Array.isArray(newUsers)) {
     return res.status(400).json({ error: "Users list must be an array." });
   }
-  await writeDbFile("users.json", newUsers);
+  writeDbFile("users.json", newUsers);
   res.json({ success: true, users: newUsers });
 });
 
@@ -324,12 +530,33 @@ Key Professional Directives:
     }
 
     // Map the incoming client message format into @google/genai contents list
-    const formattedHistory = messages.map((msg: any) => {
-      return {
+    const formattedHistory = [];
+    for (const msg of messages) {
+      const parts: any[] = [{ text: msg.text || "" }];
+      if (msg.sender === "user" && msg.attachedImageUrl) {
+        try {
+          const safeBasename = path.basename(msg.attachedImageUrl);
+          const localFilePath = path.join(UPLOADS_DIR, safeBasename);
+          if (fs.existsSync(localFilePath)) {
+            const rawBuffer = fs.readFileSync(localFilePath);
+            const mimeType = msg.attachedImageMime || "image/jpeg";
+            parts.push({
+              inlineData: {
+                data: rawBuffer.toString("base64"),
+                mimeType: mimeType
+              }
+            });
+            console.log(`[Vedic AI] Feeding attached photo from user message to Gemini: ${safeBasename}`);
+          }
+        } catch (imgErr) {
+          console.error("Error reading attached image from local file:", imgErr);
+        }
+      }
+      formattedHistory.push({
         role: msg.sender === "user" ? "user" : "model",
-        parts: [{ text: msg.text }]
-      };
-    });
+        parts
+      });
+    }
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
