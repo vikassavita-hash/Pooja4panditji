@@ -578,14 +578,20 @@ export default function App() {
     setTimeout(() => {
       setPaymentProcessing(false);
       
+      if (!selectedPuja || !selectedPackage) {
+        alert('Please choose a puja and package before confirming payment.');
+        setBookingStep('package');
+        return;
+      }
+
       const pricePaid = calculateTotalPrice();
       const newBookingId = `BKG-${Math.floor(1000 + Math.random() * 9000)}-VEDA`;
       
       const newBooking: Booking = {
         id: newBookingId,
-        pujaId: selectedPuja!.id,
-        pujaName: selectedPuja!.name,
-        pujaImage: selectedPuja!.imageUrl,
+        pujaId: selectedPuja.id,
+        pujaName: selectedPuja.name,
+        pujaImage: selectedPuja.imageUrl,
         customerName,
         customerPhone,
         customerEmail,
@@ -595,8 +601,8 @@ export default function App() {
         mode: pujaMode,
         dateTime,
         language,
-        packageId: selectedPackage!.id,
-        packageName: selectedPackage!.name,
+        packageId: selectedPackage.id,
+        packageName: selectedPackage.name,
         price: pricePaid,
         address: pujaMode === 'in-person-home' ? address : undefined,
         includeSamagriKit,
@@ -1716,7 +1722,7 @@ export default function App() {
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
               {/* STEP 1: PACKAGE DETAIL TIER SEEMS COMPACT */}
-              {bookingStep === 'package' && selectedPackage && (
+              {bookingStep === 'package' && selectedPuja && selectedPackage && (
                 <div className="space-y-6 animate-fadeIn" id="step-select-package">
                   <div className="text-center max-w-md mx-auto space-y-1">
                     <h4 className="font-extrabold text-gray-900 font-display text-lg">Choose Your Vedic Package</h4>
@@ -1798,7 +1804,7 @@ export default function App() {
               )}
 
               {/* STEP 2: DETAILS ENROLLMENT FORM */}
-              {bookingStep === 'form' && selectedPackage && (
+              {bookingStep === 'form' && selectedPuja && selectedPackage && (
                 <form onSubmit={handlePersonalFormSubmit} className="space-y-5 animate-fadeIn" id="step-devotee-form">
                   
                   <div className="p-3 bg-saffron-50 rounded-lg border border-saffron-200 flex items-center gap-2.5 text-xs text-saffron-850">
@@ -2022,7 +2028,7 @@ export default function App() {
               )}
 
               {/* STEP 3: SECURE TRANSACTION PAYMENT GATEWAY */}
-              {bookingStep === 'payment' && selectedPackage && (
+              {bookingStep === 'payment' && selectedPuja && selectedPackage && (
                 <div className="space-y-6 animate-fadeIn" id="step-payment-gateway">
                   
                   {/* Security certificate strip */}

@@ -73,7 +73,9 @@ export default function PujaCard({ puja, onBook }: PujaCardProps) {
             <Compass className="w-4 h-4 text-saffron-500" />
             <div>
               <p className="text-[10px] uppercase font-semibold text-gray-400">Dakshina Range</p>
-              <p className="font-bold text-saffron-600 font-mono">₹{puja.basePrice.toLocaleString()} - ₹{puja.packages[2].price.toLocaleString()}</p>
+              <p className="font-bold text-saffron-600 font-mono">
+                ₹{puja.basePrice.toLocaleString()} - ₹{(puja.packages[puja.packages.length - 1]?.price ?? puja.basePrice).toLocaleString()}
+              </p>
             </div>
           </div>
         </div>

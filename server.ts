@@ -28,15 +28,15 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 app.use("/uploads", express.static(UPLOADS_DIR));
 
-const MYSQL_DATABASE_URL = process.env.DATABASE_URL || process.env.MYSQL_DATABASE_URL || process.env.CLEARDB_DATABASE_URL || "";
+const MYSQL_DATABASE_URL = process.env.DATABASE_URL || process.env.MYSQL_DATABASE_URL || process.env.CLEARDB_DATABASE_URL || process.env.JAWSDB_URL || "";
 const MYSQL_CONFIG = MYSQL_DATABASE_URL
   ? parseDatabaseUrl(MYSQL_DATABASE_URL)
   : {
-      host: process.env.MYSQL_HOST || process.env.DB_HOST || "localhost",
-      user: process.env.MYSQL_USER || process.env.DB_USER || "",
-      password: process.env.MYSQL_PASSWORD || process.env.DB_PASSWORD || "",
-      database: process.env.MYSQL_DATABASE || process.env.DB_NAME || "",
-      port: parseInt(process.env.MYSQL_PORT || process.env.DB_PORT || "3306", 10),
+      host: process.env.MYSQL_HOST || process.env.DB_HOST || process.env.MYSQLHOST || process.env.DB_HOSTNAME || "localhost",
+      user: process.env.MYSQL_USER || process.env.DB_USER || process.env.MYSQLUSER || process.env.DB_USERNAME || "",
+      password: process.env.MYSQL_PASSWORD || process.env.DB_PASSWORD || process.env.MYSQLPASS || process.env.DB_USER_PASSWORD || "",
+      database: process.env.MYSQL_DATABASE || process.env.DB_NAME || process.env.MYSQLDB || process.env.DB_DATABASE || "",
+      port: parseInt(process.env.MYSQL_PORT || process.env.DB_PORT || process.env.MYSQLPORT || "3306", 10),
       ssl:
         process.env.MYSQL_SSL === "true" || process.env.MYSQL_SSL === "1"
           ? { rejectUnauthorized: true }
@@ -58,25 +58,34 @@ const MYSQL_POOL: Pool | null = MYSQL_CONFIG.user && MYSQL_CONFIG.password && MY
     })
   : null;
 
+if (!MYSQL_POOL) {
+  console.warn("[MySQL] No database pool created. Check your DATABASE_URL or MYSQL_HOST/MYSQL_USER/MYSQL_PASSWORD/MYSQL_DATABASE environment variables.");
+} else {
+  console.log(`[MySQL] Configured pool for ${MYSQL_CONFIG.user}@${MYSQL_CONFIG.host}:${MYSQL_CONFIG.port}/${MYSQL_CONFIG.database} ssl=${!!MYSQL_CONFIG.ssl}`);
+}
+
 let mysqlReady = false;
 
 function parseDatabaseUrl(url: string) {
   const parsed = new URL(url);
+  const sslMode = parsed.searchParams.get("ssl") || parsed.searchParams.get("sslmode") || parsed.searchParams.get("tls");
+  const sslEnabled = sslMode === "true" || sslMode === "require" || sslMode === "verify_ca" || sslMode === "verify_identity" || parsed.protocol === "mysqls:";
+
   return {
     host: parsed.hostname,
     port: parseInt(parsed.port || "3306", 10),
     user: decodeURIComponent(parsed.username),
     password: decodeURIComponent(parsed.password),
     database: parsed.pathname?.slice(1) || "",
-    ssl:
-      parsed.searchParams.get("ssl") === "true"
-        ? { rejectUnauthorized: true }
-        : undefined
+    ssl: sslEnabled ? { rejectUnauthorized: false } : undefined
   };
 }
 
 async function ensureMysqlConnected() {
-  if (!MYSQL_POOL) return false;
+  if (!MYSQL_POOL) {
+    console.warn("[MySQL] Pool unavailable. MySQL persistence is disabled.");
+    return false;
+  }
   if (mysqlReady) return true;
   try {
     const conn = await MYSQL_POOL.getConnection();
@@ -84,6 +93,7 @@ async function ensureMysqlConnected() {
     await ensureMysqlTables(conn);
     conn.release();
     mysqlReady = true;
+    console.log("[MySQL] Connected to Railway MySQL successfully.");
     return true;
   } catch (err) {
     console.error("[MySQL] connection failed, falling back to local JSON files:", err);
@@ -502,6 +512,21 @@ app.get("/api/health", async (req, res) => {
   res.json({ status: "healthy", timestamp: new Date().toISOString(), mysql: dbAvailable ? "connected" : "unavailable" });
 });
 
+app.get("/api/db-status", async (req, res) => {
+  const dbAvailable = await ensureMysqlConnected();
+  res.json({
+    mysqlPool: !!MYSQL_POOL,
+    mysqlReady: dbAvailable,
+    config: {
+      host: MYSQL_CONFIG.host,
+      port: MYSQL_CONFIG.port,
+      user: MYSQL_CONFIG.user,
+      database: MYSQL_CONFIG.database,
+      ssl: !!MYSQL_CONFIG.ssl
+    }
+  });
+});
+
 // Settings REST APIs
 app.get("/api/settings", async (req, res) => {
   const defaults = {
@@ -802,6 +827,8 @@ async function initServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  await ensureMysqlConnected();
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Pooja4Panditji server running on port ${PORT}`);
