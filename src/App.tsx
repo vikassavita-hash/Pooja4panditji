@@ -1237,10 +1237,10 @@ export default function App() {
                 <div className="p-3.5 bg-gradient-to-r from-saffron-50/40 via-white to-amber-50/40 border-t border-saffron-100 overflow-x-auto whitespace-nowrap flex items-center gap-2 text-xs no-scrollbar">
                   <span className="text-gray-400 font-black uppercase text-[9px] tracking-wide shrink-0">Vedic Inquiries:</span>
                   {[
-                    "Which puja helps clear commercial business debts?",
-                    "Suggest a remedial mantra for recovering our sick elders",
-                    "What items are in standard Satyanarayan samagri kit?",
-                    "Can you check dynamic dates for Griha Pravesh home warmth?"
+                    "Which puja from the catalogue is best for my family’s financial and health concerns?",
+                    `Tell me about ${pujas[0]?.name || 'your catalog puja'} and when it should be chosen.`,
+                    "What astrological remedy suits my nakshatra or vastu issue?",
+                    "How should I decide between rituals for career, wealth, or healing?"
                   ].map((pillText, i) => (
                     <button
                       key={i}
@@ -1341,7 +1341,7 @@ export default function App() {
                       ? "Free trial ended. Offer respect Shradha Dakshina to continue."
                       : hasDirectPanditAccess 
                         ? `Type your sacred query to ${settings.panditName || 'Shyam Guru ji'}...` 
-                        : `Ask ${settings.panditName || 'Shyam Guru ji'} about planetary charts, photos, mantras...`
+                        : `Ask ${settings.panditName || 'Shyam Guru ji'} about astrology, nakshatra, muhurat, vastu, or which puja fits your concern.`
                   }
                   className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-saffron-500 focus:border-transparent text-sm text-gray-800 disabled:bg-gray-150 disabled:text-gray-400 disabled:cursor-not-allowed font-medium font-sans placeholder-gray-400"
                   disabled={chatLoading || (userMsgsCount >= 3 && !hasDirectPanditAccess)}

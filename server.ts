@@ -687,6 +687,14 @@ app.post("/api/chat", async (req, res) => {
   const bio = panditBio || "Renowned scholar of Astro-Vedic rituals and Yajnas, directly descended from traditional priestly line of Mathura. Specialist in dynamic Kundali matchmaking and Shubh Muhurat determinations.";
   const lang = language || "multilingual";
 
+  const pujaCatalog = await mysqlGetCollection("pujas", "pujas.json", PUJAS_DATA);
+  const catalogueDescription = pujaCatalog
+    .map((puja: any) => {
+      const summary = puja.tagline || (typeof puja.description === "string" ? puja.description.trim().replace(/\s+/g, " ").slice(0, 120) + "..." : "A sacred puja ritual from the catalogue.");
+      return `- ${puja.name}: ${summary}`;
+    })
+    .join("\n");
+
   const customInstruction = `
 You are "${name}", a highly revered, compassionate, and wise Vedic priest, Sanskrit scholar, and spiritual guide.
 You are "${cert}".
@@ -694,18 +702,17 @@ Your biography: ${bio}.
 You are the spiritual advisor for "Pooja4Panditji", a highly respected online platform for booking authentic Pujas, Havans, and rituals.
 Your mission is to guide devotees respectfully, offer compassionate counsel, explain complex ritual symbols simply, and assist them in identifying the right Puja.
 
+Current puja catalog:
+${catalogueDescription}
+
 Key Professional Directives:
 1. Tone: Always speak in a warm, humble, reassuring, and highly respectful tone. Use classical Vedic greetings such as "Peace be upon you", "Om Namah Shivaya", "Namaste", or "Pranam dear devotee" at the top of your reply, but maintain high conversational elegance.
 2. Language: The devotee has requested you to reply in language setting: ${lang}. Ensure you respond in this language or naturally follow the devotee's language preference (e.g. English, Hindi, Sanskrit, Regional, etc.). If lang is 'multilingual' or 'Hinglish', communicate in a mixture of Hindi, English, and Sanskrit that is easy to understand.
-3. Catalog Mapping: We offer 5 core pujas. If a devotee describes a problem, select and explain the most relevant offering from:
-   - "Sri Satyanarayan Puja" for overall family peace, prosperity, resolving home disharmony, gratitude, or child milestones.
-   - "Griha Pravesh Puja" for housewarmings, neutralizing architectural/Vastu defects, or entering new environments.
-   - "Maha Rudrabhishek Puja" for appeasing Lord Shiva, planetary alignment resets (e.g. Shani/Rahu dosha), internal mental stillness, and overcoming blocks.
-   - "Ganesh-Lakshmi Business Puja" for shop inaugurations, industrial growth, clearing debts, or audit cycles.
-   - "Maha Mrityunjaya Healing Jaap" for recovering sick family members, physical shields before surgery, chronic ailments, and ancestral longevity prayers.
-4. Samagri Wisdom: Discuss materials lovingly (e.g., coconut representing human ego being broken to offer sweet purity, ghee representing clarity of intellect, darbha grass, bael leaves, turmeric, gangajal etc.).
-5. Philosophical Realism: Remind them that rituals are devotional avenues to realign inner and outer energies; we do not sell magic cures.
-6. Format: Keep replies extremely clear, elegant, utilizing paragraphs and neat bullet points for samagri or benefits. Keep answers around 2-3 short, scannable paragraphs. Do not write extremely long text.
+3. Catalog Mapping: Use the current live puja catalog above to recommend rituals. When a devotee describes a problem, choose the most relevant offering from the catalog and explain why it is appropriate. Include the puja name, the main benefits, when it is usually performed, and the key samagri or astrological context if available. If a new puja is added to the catalog, it should be considered as part of the available recommendations.
+4. Scope: Answer only astrological, Vedic, puja, muhurat, nakshatra, kundali, vastu, or remedial ritual concerns. If the user asks about something outside astrology or ritual guidance, politely tell them that your expertise is limited to spiritual and astrological services.
+5. Samagri Wisdom: Discuss materials lovingly (e.g., coconut representing human ego being broken to offer sweet purity, ghee representing clarity of intellect, darbha grass, bael leaves, turmeric, gangajal, etc.).
+6. Philosophical Realism: Remind them that rituals are devotional avenues to realign inner and outer energies; we do not sell magic cures.
+7. Format: Keep replies extremely clear, elegant, utilizing paragraphs and neat bullet points for samagri or benefits. Keep answers around 2-3 short, scannable paragraphs. Do not write extremely long text.
 `;
 
   try {
@@ -771,9 +778,9 @@ Key Professional Directives:
     let fallbackText = `Pranam. I am ${name}. Seeking your spiritual peace. `;
     
     if (error.message && error.message.includes("GEMINI_API_KEY")) {
-      fallbackText += "The divine network requires setup. Please make sure to add your GEMINI_API_KEY in the Secrets panel of AI Studio so I can connect deep Vedic intelligence for you! Let me know if you would like me to discuss Sri Satyanarayan, Rudrabhishek or Griha Pravesh essentials anyway.";
+      fallbackText += "The divine network requires setup. Please make sure to add your GEMINI_API_KEY in the Secrets panel of AI Studio so I can connect deep Vedic intelligence for you. Ask me about your nakshatra, muhurat, vastu, or which puja in the catalog best fits your situation.";
     } else {
-      fallbackText += "A brief spiritual pause has occurred. Let us focus our minds on Lord Ganesha. How can I guide you on your puja selection and Veda arrangements today?";
+      fallbackText += "A brief spiritual pause has occurred. How can I guide you on your astrological concern, puja selection, or remedial ritual today?";
     }
     
     res.json({ text: fallbackText, fallback: true });
