@@ -34,23 +34,26 @@ const RAW_URL = process.env.MYSQL_PUBLIC_URL || process.env.MYSQL_URL || process
 function parseDatabaseUrl(url: string) {
   try {
     const parsed = new URL(url);
+    const sslMode = parsed.searchParams.get("ssl") || parsed.searchParams.get("sslmode") || parsed.searchParams.get("tls");
+    const sslEnabled = sslMode === "true" || sslMode === "require" || sslMode === "verify_ca" || sslMode === "verify_identity" || parsed.protocol === "mysqls:";
     return {
       host: parsed.hostname,
       port: parseInt(parsed.port || "3306", 10),
       user: decodeURIComponent(parsed.username),
       password: decodeURIComponent(parsed.password),
       database: parsed.pathname?.slice(1) || "railway",
-      ssl: { rejectUnauthorized: false } // Required for external proxies
+      ssl: sslEnabled ? { rejectUnauthorized: false } : undefined
     };
   } catch (e) {
     // Graceful fallback to individual env parameters
+    const sslEnabled = process.env.MYSQL_SSL === "true" || process.env.MYSQL_SSL === "1";
     return {
       host: process.env.MYSQLHOST || "localhost",
       port: parseInt(process.env.MYSQLPORT || "3306", 10),
       user: process.env.MYSQLUSER || "root",
       password: process.env.MYSQLPASSWORD || "",
       database: process.env.MYSQLDATABASE || "railway",
-      ssl: process.env.MYSQLHOST && process.env.MYSQLHOST !== "localhost" ? { rejectUnauthorized: false } : undefined
+      ssl: sslEnabled ? { rejectUnauthorized: false } : undefined
     };
   }
 }
@@ -73,13 +76,16 @@ const MYSQL_POOL: Pool | null = createPool({
   keepAliveInitialDelay: 10000,
   connectTimeout: 30000,
   allowPublicKeyRetrieval: true // Essential fix for Railway MySQL 8 environments
-});
+} as any);
 
 let mysqlReady = false;
 
 async function ensureMysqlConnected() {
   if (!MYSQL_POOL) return false;
   try {
+    if (!mysqlReady) {
+      console.log(`[MySQL] Attempting connection to target host: ${MYSQL_CONFIG.host}:${MYSQL_CONFIG.port}`);
+    }
     const conn = await MYSQL_POOL.getConnection();
     try {
       await conn.ping();
