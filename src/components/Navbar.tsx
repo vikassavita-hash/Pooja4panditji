@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Sparkles, Calendar, MessageSquare, PhoneCall, Gift, HeartHandshake, Lock, User, LogOut, Menu, X } from 'lucide-react';
+import { Sparkles, Calendar, MessageSquare, PhoneCall, Gift, HeartHandshake, Lock, User, LogOut, Menu, X, Image } from 'lucide-react';
 import { UserAccount } from '../types';
 
 interface NavbarProps {
-  activeTab: 'pujas' | 'chat' | 'bookings' | 'admin';
-  setActiveTab: (tab: 'pujas' | 'chat' | 'bookings' | 'admin') => void;
+  activeTab: 'pujas' | 'chat' | 'bookings' | 'admin' | 'gallery';
+  setActiveTab: (tab: 'pujas' | 'chat' | 'bookings' | 'admin' | 'gallery') => void;
   bookingCount: number;
   contactPhone?: string;
   whatsappNumber?: string;
@@ -25,7 +25,7 @@ export default function Navbar({
 }: NavbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleTabClick = (tab: 'pujas' | 'chat' | 'bookings' | 'admin') => {
+  const handleTabClick = (tab: 'pujas' | 'chat' | 'bookings' | 'admin' | 'gallery') => {
     setActiveTab(tab);
     setIsMobileMenuOpen(false);
   };
@@ -103,6 +103,20 @@ export default function Navbar({
             >
               <HeartHandshake className="w-4 h-4 text-saffron-500" />
               <span>Explore Pujas</span>
+            </button>
+
+            {/* Gallery Link */}
+            <button
+              id="nav-gallery-btn"
+              onClick={() => handleTabClick('gallery')}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 cursor-pointer ${
+                activeTab === 'gallery'
+                  ? 'bg-saffron-50 text-saffron-700 border-b-2 border-saffron-500 font-bold'
+                  : 'text-gray-600 hover:text-saffron-600 hover:bg-saffron-50/50'
+              }`}
+            >
+              <Image className="w-4 h-4 text-saffron-500" />
+              <span>Pujas Performed</span>
             </button>
 
             {/* Pandit Ji Chatbot Link */}
@@ -231,6 +245,19 @@ export default function Navbar({
             >
               <HeartHandshake className="w-4 h-4" />
               <span>Explore Pujas</span>
+            </button>
+
+            {/* Gallery Tab */}
+            <button
+              onClick={() => handleTabClick('gallery')}
+              className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-3 transition-colors ${
+                activeTab === 'gallery'
+                  ? 'bg-saffron-500 text-white shadow-xs'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Image className="w-4 h-4" />
+              <span>Pujas Performed</span>
             </button>
 
             {/* AI Pandit Chat Tab */}

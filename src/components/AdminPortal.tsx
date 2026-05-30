@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Puja, Booking, PujaPackage, PortalSettings, UserAccount } from '../types';
+import { Puja, Booking, PujaPackage, PortalSettings, UserAccount, GalleryItem } from '../types';
 import { 
   Lock, ShieldCheck, Eye, Edit2, Check, RefreshCw, LogOut, 
   Image, CheckCircle, Calendar, FileText, Sparkles, Sliders,
   MessageSquare, Layers, Coins, Info, Trash2, PlusCircle, Settings, HelpCircle,
-  Users, Download
+  Users, Download, Video
 } from 'lucide-react';
 
 interface AdminPortalProps {
@@ -15,9 +15,11 @@ interface AdminPortalProps {
   settings: PortalSettings;
   setSettings: React.Dispatch<React.SetStateAction<PortalSettings>>;
   users: UserAccount[];
+  gallery: GalleryItem[];
+  setGallery: React.Dispatch<React.SetStateAction<GalleryItem[]>>;
 }
 
-export default function AdminPortal({ bookings, setBookings, pujas, setPujas, settings, setSettings, users }: AdminPortalProps) {
+export default function AdminPortal({ bookings, setBookings, pujas, setPujas, settings, setSettings, users, gallery, setGallery }: AdminPortalProps) {
   const [passcode, setPasscode] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     // Check session safety
@@ -26,7 +28,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
   const [errorMsg, setErrorMsg] = useState('');
 
   // Tab state inside admin dashboard
-  const [adminSubTab, setAdminSubTab] = useState<'bookings' | 'users' | 'catalog' | 'settings' | 'email_logs'>('bookings');
+  const [adminSubTab, setAdminSubTab] = useState<'bookings' | 'users' | 'catalog' | 'settings' | 'email_logs' | 'gallery_mgmt'>('bookings');
   const [emailLogs, setEmailLogs] = useState<any[]>([]);
 
   React.useEffect(() => {
@@ -198,6 +200,113 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
   const [localGoogleAppPassword, setLocalGoogleAppPassword] = useState(settings.googleAppPassword || '');
 
   const [settingsSuccessMsg, setSettingsSuccessMsg] = useState('');
+
+  // Done Pujas Gallery state variables
+  const [selectedGalleryItem, setSelectedGalleryItem] = useState<GalleryItem | null>(null);
+  const [isAddingNewGallery, setIsAddingNewGallery] = useState(false);
+  const [newGalleryTitle, setNewGalleryTitle] = useState('');
+  const [newGalleryDesc, setNewGalleryDesc] = useState('');
+  const [newGalleryDate, setNewGalleryDate] = useState('');
+  const [newGalleryImage, setNewGalleryImage] = useState('https://images.unsplash.com/photo-1620121692029-d088224ddc74?auto=format&fit=crop&q=80&w=800');
+  const [newGalleryVideo, setNewGalleryVideo] = useState('');
+  
+  const [editGalleryTitle, setEditGalleryTitle] = useState('');
+  const [editGalleryDesc, setEditGalleryDesc] = useState('');
+  const [editGalleryDate, setEditGalleryDate] = useState('');
+  const [editGalleryImage, setEditGalleryImage] = useState('');
+  const [editGalleryVideo, setEditGalleryVideo] = useState('');
+  
+  const [gallerySaveSuccess, setGallerySaveSuccess] = useState('');
+
+  const handleCreateGalleryItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newGalleryTitle || !newGalleryDesc || !newGalleryDate) {
+      alert("Please fill out the title, description, and performance date.");
+      return;
+    }
+
+    const newItem: GalleryItem = {
+      id: 'gal_' + Date.now(),
+      title: newGalleryTitle,
+      description: newGalleryDesc,
+      date: newGalleryDate,
+      imageUrl: newGalleryImage,
+      videoUrl: newGalleryVideo || undefined
+    };
+
+    const updated = [newItem, ...gallery];
+    setGallery(updated);
+    
+    // Save to server
+    fetch('/api/gallery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated)
+    }).catch(err => console.error("Could not save gallery item:", err));
+
+    setNewGalleryTitle('');
+    setNewGalleryDesc('');
+    setNewGalleryDate('');
+    setNewGalleryImage('https://images.unsplash.com/photo-1620121692029-d088224ddc74?auto=format&fit=crop&q=80&w=800');
+    setNewGalleryVideo('');
+    setIsAddingNewGallery(false);
+    setSelectedGalleryItem(newItem);
+    
+    setGallerySaveSuccess(`Successfully added performed puja: "${newItem.title}"`);
+    setTimeout(() => setGallerySaveSuccess(''), 5000);
+  };
+
+  const handleSaveGalleryChanges = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedGalleryItem) return;
+
+    const updated = gallery.map(item => {
+      if (item.id === selectedGalleryItem.id) {
+        return {
+          ...item,
+          title: editGalleryTitle,
+          description: editGalleryDesc,
+          date: editGalleryDate,
+          imageUrl: editGalleryImage,
+          videoUrl: editGalleryVideo || undefined
+        };
+      }
+      return item;
+    });
+
+    setGallery(updated);
+    
+    // Save to server
+    fetch('/api/gallery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated)
+    }).catch(err => console.error("Could not update gallery item:", err));
+
+    setGallerySaveSuccess('Successfully updated performed puja.');
+    setTimeout(() => setGallerySaveSuccess(''), 5000);
+  };
+
+  const handleDeleteGalleryItem = (id: string) => {
+    const itemToDelete = gallery.find(g => g.id === id);
+    if (!itemToDelete) return;
+
+    if (confirm(`Are you sure you want to remove the performed puja "${itemToDelete.title}"?`)) {
+      const updated = gallery.filter(g => g.id !== id);
+      setGallery(updated);
+      
+      // Save to server
+      fetch('/api/gallery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      }).catch(err => console.error("Could not delete gallery item:", err));
+
+      setSelectedGalleryItem(null);
+      setGallerySaveSuccess(`Deleted performed puja: "${itemToDelete.title}"`);
+      setTimeout(() => setGallerySaveSuccess(''), 5000);
+    }
+  };
 
   // Curated premium high-quality secure temple image presets for easy Deity photo-changing
   const SACRED_IMAGE_PRESETS = [
@@ -618,6 +727,18 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
           id="admin-tab-catalog"
         >
           Catalog Price & Photo Control
+        </button>
+
+        <button
+          onClick={() => setAdminSubTab('gallery_mgmt')}
+          className={`pb-2.5 px-4 text-xs tracking-wider uppercase transition-all duration-200 cursor-pointer ${
+            adminSubTab === 'gallery_mgmt'
+              ? 'text-saffron-700 font-extrabold border-b-2 border-saffron-600'
+              : 'text-gray-500 hover:text-saffron-600'
+          }`}
+          id="admin-tab-gallery"
+        >
+          Sacred Gallery Management ({gallery.length})
         </button>
 
         <button

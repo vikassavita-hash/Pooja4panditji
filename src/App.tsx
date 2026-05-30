@@ -2,17 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import Navbar from './components/Navbar';
 import PujaCard from './components/PujaCard';
 import { PUJAS_DATA } from './data/pujas';
-import { Puja, Booking, ChatMessage, PujaPackage, PortalSettings, UserAccount } from './types';
+import { DEFAULT_GALLERY_DATA } from './data/gallery';
+import { Puja, Booking, ChatMessage, PujaPackage, PortalSettings, UserAccount, GalleryItem } from './types';
 import AdminPortal from './components/AdminPortal';
 import { 
   Sparkles, ShieldCheck, CreditCard, Clock, MapPin, Globe, CheckCircle2, 
   Calendar, Check, User, Phone, Mail, Award, ArrowRight, MessageSquare, 
   AlertTriangle, Play, HelpCircle, FileText, Smartphone, ExternalLink,
-  ChevronRight, Lock, RefreshCw, Volume2, Info, CheckSquare, Paperclip, Camera
+  ChevronRight, Lock, RefreshCw, Volume2, Info, CheckSquare, Paperclip, Camera, Video
 } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'pujas' | 'chat' | 'bookings' | 'admin'>('pujas');
+  const [activeTab, setActiveTab] = useState<'pujas' | 'chat' | 'bookings' | 'admin' | 'gallery'>('pujas');
   const [pujas, setPujas] = useState<Puja[]>(() => {
     const saved = localStorage.getItem('pooja4panditji_pujas_catalog');
     if (saved) {
@@ -34,6 +35,28 @@ export default function App() {
       body: JSON.stringify(pujas)
     }).catch(err => console.error("Could not sync pujas to backend:", err));
   }, [pujas]);
+
+  const [gallery, setGallery] = useState<GalleryItem[]>(() => {
+    const saved = localStorage.getItem('pooja4panditji_gallery');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (err) {
+        console.error("Failed to parse local storage gallery.");
+      }
+    }
+    return DEFAULT_GALLERY_DATA;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('pooja4panditji_gallery', JSON.stringify(gallery));
+    // Persist to backend database
+    fetch('/api/gallery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(gallery)
+    }).catch(err => console.error("Could not sync gallery to backend:", err));
+  }, [gallery]);
 
   const [settings, setSettings] = useState<PortalSettings>(() => {
     const saved = localStorage.getItem('pooja4panditji_settings');
@@ -176,6 +199,15 @@ export default function App() {
             setBookings(bookingsList);
           }
         }
+
+        // 5. Sync Gallery
+        const galleryRes = await fetch('/api/gallery');
+        if (galleryRes.ok) {
+          const galleryList = await galleryRes.json();
+          if (Array.isArray(galleryList) && galleryList.length > 0) {
+            setGallery(galleryList);
+          }
+        }
       } catch (error) {
         console.error("Initial backend synchronization pause (server offline or compiling):", error);
       }
@@ -197,6 +229,9 @@ export default function App() {
   const [consultFormGothra, setConsultFormGothra] = useState('');
   const [consultFormNotes, setConsultFormNotes] = useState('');
   const [consultPayMethod, setConsultPayMethod] = useState<'upi' | 'card'>('upi');
+
+  const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
+  const [activeVideoTitle, setActiveVideoTitle] = useState<string | null>(null);
 
   // Helper to re-evaluate the active status and expiry
   const updateAccessFromStorage = () => {
@@ -1579,7 +1614,112 @@ export default function App() {
             settings={settings}
             setSettings={setSettings}
             users={users}
+            gallery={gallery}
+            setGallery={setGallery}
           />
+        )}
+
+        {/* TAB 5: PERFORMED PUJAS GALLERY */}
+        {activeTab === 'gallery' && (
+          <div className="space-y-8 animate-fadeIn" id="performed-pujas-gallery">
+            
+            {/* Gallery Hero Title Banner */}
+            <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-amber-900 via-saffron-800 to-amber-950 text-white p-6 sm:p-10 shadow-xl">
+              <div className="absolute right-0 top-0 bottom-0 opacity-10 pointer-events-none flex items-center justify-center p-6 select-none">
+                <span className="text-[150px] sm:text-[280px] font-bold font-display rotate-6">ॐ</span>
+              </div>
+              <div className="relative max-w-2xl space-y-3">
+                <span className="inline-flex items-center gap-1 bg-white/20 text-gold-100 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase tracking-wider border border-white/10 backdrop-blur-md">
+                  <Video className="w-3.5 h-3.5 text-gold-200 animate-pulse animate-duration-1000" />
+                  Showcasing Sacred Done Pujas & Live Video Records
+                </span>
+                <h2 className="text-2xl sm:text-4xl font-extrabold font-display leading-tight text-gold-100 tracking-tight">
+                  Divine Rites Already Performed
+                </h2>
+                <p className="text-xs sm:text-sm text-saffron-100 font-medium leading-relaxed font-sans">
+                  Browse our high-fidelity photo journal and live video broadcasts of completed Yajnas, Havans, and Rudrabhishek paths. Witness the sanctity and precision of ancient Vedic lineages performed directly on behalf of devotees worldwide.
+                </p>
+              </div>
+            </div>
+
+            {/* Showcase Bento Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {gallery.map((item) => (
+                <div 
+                  key={item.id} 
+                  className="bg-white rounded-2xl border border-saffron-100 shadow-md overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group"
+                >
+                  {/* Photo Container with hover scale and Play overlay */}
+                  <div className="relative aspect-video overflow-hidden bg-gray-100 shrink-0">
+                    <img 
+                      src={item.imageUrl} 
+                      alt={item.title} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1620121692029-d088224ddc74?auto=format&fit=crop&q=80&w=800";
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors duration-200" />
+                    
+                    {item.videoUrl && (
+                      <button
+                        onClick={() => {
+                          setActiveVideoUrl(item.videoUrl || null);
+                          setActiveVideoTitle(item.title);
+                        }}
+                        className="absolute inset-0 m-auto w-14 h-14 rounded-full bg-linear-to-tr from-saffron-600 to-amber-500 text-white flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-110 cursor-pointer focus:outline-none"
+                        title="Play Devotional Video Broadcast"
+                      >
+                        <Play className="w-6 h-6 fill-white text-white ml-0.5" />
+                      </button>
+                    )}
+
+                    <span className="absolute bottom-3 left-3 bg-black/60 text-white font-mono text-[10px] px-2 py-0.5 rounded backdrop-blur-xs font-semibold">
+                      Performed: {new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  </div>
+
+                  {/* Body Content */}
+                  <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                    <div className="space-y-2">
+                      <h4 className="font-extrabold text-gray-900 font-display text-base leading-tight group-hover:text-saffron-700 transition-colors">
+                        {item.title}
+                      </h4>
+                      <p className="text-xs text-gray-500 leading-relaxed font-sans">
+                        {item.description}
+                      </p>
+                    </div>
+
+                    {item.videoUrl && (
+                      <button
+                        onClick={() => {
+                          setActiveVideoUrl(item.videoUrl || null);
+                          setActiveVideoTitle(item.title);
+                        }}
+                        className="w-full py-2 bg-saffron-50 hover:bg-saffron-100 text-saffron-850 border border-saffron-200/50 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer focus:outline-none"
+                      >
+                        <Video className="w-4 h-4 text-saffron-650" />
+                        <span>Watch Puja Broadcast</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Empty Showcase State */}
+            {gallery.length === 0 && (
+              <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center max-w-lg mx-auto shadow-md">
+                <Image className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <h4 className="text-lg font-bold text-gray-700 font-display">No Performed Pujas Showcased</h4>
+                <p className="text-xs text-gray-500 mt-2 font-sans">
+                  Our shastri counselors haven't uploaded any past ceremony highlights or video path logs. Check back soon for auspicious showcases!
+                </p>
+              </div>
+            )}
+
+          </div>
         )}
 
       </main>
@@ -3079,6 +3219,50 @@ export default function App() {
                 Accept & Close Terms
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: RESPONSIVE DEVOTIONAL VIDEO PLAYER OVERLAY */}
+      {activeVideoUrl && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/85 backdrop-blur-md flex items-center justify-center p-4" id="video-modal-overlay">
+          <div className="relative bg-neutral-950 w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl border border-neutral-800 flex flex-col max-h-[90vh] animate-slideUp">
+            
+            {/* Heading Header */}
+            <div className="bg-linear-to-r from-saffron-850 to-neutral-900 text-white p-5 pr-12 flex justify-between items-center border-b border-neutral-800">
+              <div>
+                <span className="text-[10px] uppercase tracking-widest font-mono font-bold text-gold-400">Sacred Puja Done Broadcast Recording</span>
+                <h3 className="text-lg font-bold font-display text-white mt-0.5">{activeVideoTitle}</h3>
+              </div>
+              
+              <button
+                onClick={() => {
+                  setActiveVideoUrl(null);
+                  setActiveVideoTitle(null);
+                }}
+                className="absolute top-4 right-4 text-neutral-400 hover:text-white bg-white/5 hover:bg-white/10 w-8 h-8 rounded-full flex items-center justify-center font-bold text-lg select-none transition-all focus:outline-none cursor-pointer"
+                id="close-video-modal-btn"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Video Iframe Container */}
+            <div className="relative w-full aspect-video bg-black flex items-center justify-center">
+              <iframe
+                src={activeVideoUrl}
+                title={activeVideoTitle || "Done Puja Recording"}
+                className="absolute inset-0 w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              ></iframe>
+            </div>
+
+            {/* Footer information */}
+            <div className="p-4 bg-neutral-950 text-neutral-500 text-[11px] leading-relaxed text-center font-medium border-t border-neutral-800">
+              🕉️ Recited in absolute alignment with traditional Vedic swaras and guidelines. 🕉️
+            </div>
+
           </div>
         </div>
       )}

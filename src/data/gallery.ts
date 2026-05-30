@@ -1,0 +1,28 @@
+import { GalleryItem } from '../types';
+
+export const DEFAULT_GALLERY_DATA: GalleryItem[] = [
+  {
+    id: 'gal_1',
+    title: 'Maha Rudrabhishek Yajna at Kashi temple',
+    description: 'Auspicious Lord Shiva invocation conducted with 11 expert Vedic Acharyas for family health, absolute peace, and planetary dosha mitigation.',
+    date: '2026-03-12',
+    imageUrl: 'https://images.unsplash.com/photo-1599819811279-d5ad9cccf838?auto=format&fit=crop&q=80&w=800',
+    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
+  },
+  {
+    id: 'gal_2',
+    title: 'Ganesh Lakshmi Business Shubh Labh Puja',
+    description: 'Corporate shop inauguration and merchant account blessing ceremony done with sacred red sandalwood and gold-plated divine altars.',
+    date: '2026-04-20',
+    imageUrl: 'https://images.unsplash.com/photo-1608958416715-db809f6eeb6f?auto=format&fit=crop&q=80&w=800',
+    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
+  },
+  {
+    id: 'gal_3',
+    title: 'Griha Pravesh & Vastu Purusha Shanti Havan',
+    description: 'Devotee housewarming purification rituals performed to neutralize architectural directions defects and invite positive cosmic vibrations.',
+    date: '2026-05-18',
+    imageUrl: 'https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?auto=format&fit=crop&q=80&w=800',
+    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
+  }
+];

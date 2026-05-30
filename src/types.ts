@@ -108,3 +108,12 @@ export interface UserAccount {
   isAdmin?: boolean;
 }
 
+export interface GalleryItem {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  imageUrl: string;
+  videoUrl?: string;
+}
+

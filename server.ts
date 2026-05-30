@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import nodemailer from "nodemailer";
 import { createPool, Pool, PoolConnection } from "mysql2/promise";
 import { PUJAS_DATA } from "./src/data/pujas";
+import { DEFAULT_GALLERY_DATA } from "./src/data/gallery";
 
 dotenv.config();
 
@@ -135,6 +136,12 @@ async function ensureMysqlTables(conn: PoolConnection) {
       id VARCHAR(255) PRIMARY KEY,
       data JSON NOT NULL,
       createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS gallery (
+      id VARCHAR(255) PRIMARY KEY,
+      data JSON NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 }
@@ -428,13 +435,19 @@ app.post("/api/settings", async (req, res) => {
 
 app.post("/api/upload", (req, res) => {
   const { filename, base64 } = req.body;
-  if (!filename || !base64) return res.status(400).json({ error: "Missing payload." });
+  if (!filename || !base64) {
+    console.error("[Upload] Missing filename or base64 payload in request body:", Object.keys(req.body || {}));
+    return res.status(400).json({ error: "Missing payload." });
+  }
   try {
     let pureBase64 = base64.includes(";base64,") ? base64.split(";base64,").pop() || "" : base64;
     const safeName = `${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-    fs.writeFileSync(path.join(UPLOADS_DIR, safeName), Buffer.from(pureBase64, "base64"));
+    const targetPath = path.join(UPLOADS_DIR, safeName);
+    fs.writeFileSync(targetPath, Buffer.from(pureBase64, "base64"));
+    console.log(`[Upload] Successfully saved image to: ${targetPath}`);
     res.json({ success: true, url: `/uploads/${safeName}` });
   } catch (err) {
+    console.error("[Upload] Critical error saving photo upload:", err);
     res.status(500).json({ error: "Failed to save asset." });
   }
 });
@@ -447,6 +460,16 @@ app.post("/api/pujas", async (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: "Must be an array." });
   await mysqlSaveCollection("pujas", "pujas.json", req.body, "id");
   res.json({ success: true, pujas: req.body });
+});
+
+app.get("/api/gallery", async (req, res) => {
+  res.json(await mysqlGetCollection("gallery", "gallery.json", DEFAULT_GALLERY_DATA));
+});
+
+app.post("/api/gallery", async (req, res) => {
+  if (!Array.isArray(req.body)) return res.status(400).json({ error: "Must be an array." });
+  await mysqlSaveCollection("gallery", "gallery.json", req.body, "id");
+  res.json({ success: true, gallery: req.body });
 });
 
 app.get("/api/bookings", async (req, res) => {
