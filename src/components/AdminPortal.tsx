@@ -1219,9 +1219,13 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                           const file = e.target.files?.[0];
                           if (file) {
                             try {
+                              console.log('[PujaImageUpload] Starting upload for:', file.name);
                               const uploadedUrl = await performPhotoUpload(file);
+                              console.log('[PujaImageUpload] Upload successful:', uploadedUrl);
                               setNewPujaImage(uploadedUrl);
-                            } catch (err) {}
+                            } catch (err) {
+                              console.error('[PujaImageUpload] Upload failed:', err);
+                            }
                           }
                         }}
                         className="block w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-[11px] file:font-extrabold file:bg-linear-to-r file:from-saffron-500 file:to-amber-500 file:text-white hover:file:opacity-90 cursor-pointer"

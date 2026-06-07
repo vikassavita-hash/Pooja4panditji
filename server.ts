@@ -435,20 +435,26 @@ app.post("/api/settings", async (req, res) => {
 
 app.post("/api/upload", (req, res) => {
   const { filename, base64 } = req.body;
+  console.log('[Upload] Received upload request:', { filename: filename?.substring(0, 50), hasBase64: !!base64 });
+  
   if (!filename || !base64) {
     console.error("[Upload] Missing filename or base64 payload in request body:", Object.keys(req.body || {}));
-    return res.status(400).json({ error: "Missing payload." });
+    return res.status(400).json({ success: false, error: "Missing filename or base64 payload." });
   }
   try {
     let pureBase64 = base64.includes(";base64,") ? base64.split(";base64,").pop() || "" : base64;
     const safeName = `${Date.now()}-${filename.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
     const targetPath = path.join(UPLOADS_DIR, safeName);
-    fs.writeFileSync(targetPath, Buffer.from(pureBase64, "base64"));
-    console.log(`[Upload] Successfully saved image to: ${targetPath}`);
-    res.json({ success: true, url: `/uploads/${safeName}` });
+    
+    const buffer = Buffer.from(pureBase64, "base64");
+    fs.writeFileSync(targetPath, buffer);
+    
+    console.log(`[Upload] Successfully saved image to: ${targetPath} (${buffer.length} bytes)`);
+    const uploadedUrl = `/uploads/${safeName}`;
+    res.json({ success: true, url: uploadedUrl });
   } catch (err) {
     console.error("[Upload] Critical error saving photo upload:", err);
-    res.status(500).json({ error: "Failed to save asset." });
+    res.status(500).json({ success: false, error: "Failed to save asset to server: " + String(err).substring(0, 100) });
   }
 });
 
