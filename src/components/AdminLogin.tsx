@@ -18,16 +18,22 @@ export default function AdminLogin({ onLoginSuccess, adminCredentials }: AdminLo
     setIsLoading(true);
 
     try {
+      console.log('[AdminLogin] Attempting login with:', { userId, credentialsCount: adminCredentials?.length });
+      console.log('[AdminLogin] Available credentials:', adminCredentials);
+      
       // Validate credentials against admin users
-      const adminUser = adminCredentials.find(
+      const adminUser = adminCredentials?.find(
         (user) => user.userId === userId && user.passwordHash === password
       );
 
       if (!adminUser) {
+        console.log('[AdminLogin] No matching credentials found. Provided:', { userId, password }, 'Available:', adminCredentials);
         setErrorMsg('Invalid User ID or Password. Admin access denied.');
         setIsLoading(false);
         return;
       }
+      
+      console.log('[AdminLogin] Credentials matched! Logging in...');
 
       // Store authentication in session
       sessionStorage.setItem('pooja4pandit_admin_auth', 'true');

@@ -76,7 +76,13 @@ export default function App() {
       showAiPanditTab: true,
       showMyBookingsTab: true,
       showAdminPortalTab: true,
-      devoteeTerms: '1. All devotion services (Shradha Dakshina) are verified secure.\n2. The simulated handshakes are for instructional, direct, offline and virtual connect.\n3. By booking any puja, the devotee agrees to provide accurate Birth coordinates, Gothra and Nakshatra.\n4. Standard 24 Hours validity applies to digital chatbot and voice consult channels.\n5. Vedic rituals represent deep lineage devotion.'
+      devoteeTerms: '1. All devotion services (Shradha Dakshina) are verified secure.\n2. The simulated handshakes are for instructional, direct, offline and virtual connect.\n3. By booking any puja, the devotee agrees to provide accurate Birth coordinates, Gothra and Nakshatra.\n4. Standard 24 Hours validity applies to digital chatbot and voice consult channels.\n5. Vedic rituals represent deep lineage devotion.',
+      adminUsers: [
+        {
+          userId: 'vikas.savita@smollan.com',
+          passwordHash: 'admin123'
+        }
+      ]
     };
     if (saved) {
       try {
