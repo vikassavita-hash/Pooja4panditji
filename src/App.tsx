@@ -5,11 +5,14 @@ import { PUJAS_DATA } from './data/pujas';
 import { DEFAULT_GALLERY_DATA } from './data/gallery';
 import { Puja, Booking, ChatMessage, PujaPackage, PortalSettings, UserAccount, GalleryItem } from './types';
 import AdminPortal from './components/AdminPortal';
+import ImageSlider from './components/ImageSlider';
+import AdminLogin from './components/AdminLogin';
 import { 
   Sparkles, ShieldCheck, CreditCard, Clock, MapPin, Globe, CheckCircle2, 
   Calendar, Check, User, Phone, Mail, Award, ArrowRight, MessageSquare, 
   AlertTriangle, Play, HelpCircle, FileText, Smartphone, ExternalLink,
-  ChevronRight, Lock, RefreshCw, Volume2, Info, CheckSquare, Paperclip, Camera, Video
+  ChevronRight, Lock, RefreshCw, Volume2, Info, CheckSquare, Paperclip, Camera, Video,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export default function App() {
@@ -95,6 +98,22 @@ export default function App() {
       body: JSON.stringify(settings)
     }).catch(err => console.error("Could not sync settings to backend:", err));
   }, [settings]);
+
+  // Admin authentication state
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
+    return sessionStorage.getItem('pooja4pandit_admin_auth') === 'true';
+  });
+
+  const handleAdminLoginSuccess = () => {
+    setIsAdminAuthenticated(true);
+  };
+
+  const handleAdminLogout = () => {
+    sessionStorage.removeItem('pooja4pandit_admin_auth');
+    sessionStorage.removeItem('pooja4pandit_admin_user');
+    setIsAdminAuthenticated(false);
+    setActiveTab('pujas');
+  };
 
   // Devotee state structures
   const [users, setUsers] = useState<UserAccount[]>(() => {
@@ -939,6 +958,11 @@ export default function App() {
               </div>
             </div>
 
+            {/* Image Slider Gallery */}
+            {gallery && gallery.length > 0 && (
+              <ImageSlider images={gallery} autoplayInterval={5000} />
+            )}
+
             {/* Puja Category Filter & Tags */}
             <div className="space-y-4" id="categories-tabs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-saffron-100 pb-4">
@@ -1606,17 +1630,26 @@ export default function App() {
 
         {/* TAB 4: ADMIN PORTAL */}
         {activeTab === 'admin' && (
-          <AdminPortal 
-            bookings={bookings} 
-            setBookings={setBookings}
-            pujas={pujas} 
-            setPujas={setPujas} 
-            settings={settings}
-            setSettings={setSettings}
-            users={users}
-            gallery={gallery}
-            setGallery={setGallery}
-          />
+          <>
+            {isAdminAuthenticated ? (
+              <AdminPortal 
+                bookings={bookings} 
+                setBookings={setBookings}
+                pujas={pujas} 
+                setPujas={setPujas} 
+                settings={settings}
+                setSettings={setSettings}
+                users={users}
+                gallery={gallery}
+                setGallery={setGallery}
+              />
+            ) : (
+              <AdminLogin 
+                onLoginSuccess={handleAdminLoginSuccess}
+                adminCredentials={settings.adminUsers || []}
+              />
+            )}
+          </>
         )}
 
         {/* TAB 5: PERFORMED PUJAS GALLERY */}
@@ -1711,7 +1744,7 @@ export default function App() {
             {/* Empty Showcase State */}
             {gallery.length === 0 && (
               <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center max-w-lg mx-auto shadow-md">
-                <Image className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <ImageIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <h4 className="text-lg font-bold text-gray-700 font-display">No Performed Pujas Showcased</h4>
                 <p className="text-xs text-gray-500 mt-2 font-sans">
                   Our shastri counselors haven't uploaded any past ceremony highlights or video path logs. Check back soon for auspicious showcases!

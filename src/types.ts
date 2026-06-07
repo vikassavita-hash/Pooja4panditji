@@ -24,7 +24,7 @@ export interface Puja {
   description: string;
   significance: string;
   category: 'prosperity' | 'remedial' | 'milestones' | 'festivals' | 'peace' | 'education' | 'ancestral';
-   deity: string;
+  deity: string;
   rating: number;
   reviewCount: number;
   durationString: string;
@@ -34,6 +34,7 @@ export interface Puja {
   samagriList: SamagriItem[];
   mantra: string;
   mantraMeaning: string;
+  performance?: string; // Optional performance notes or status field
 }
 
 export interface Booking {
@@ -94,6 +95,8 @@ export interface PortalSettings {
   // Dynamic Real Gmail SMTP Integrations
   gmailAddress?: string;
   googleAppPassword?: string;
+  // Admin credentials storage
+  adminUsers?: Array<{ userId: string; passwordHash: string }>;
 }
 
 export interface UserAccount {

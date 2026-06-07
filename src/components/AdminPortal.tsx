@@ -119,6 +119,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
   const [customStandardPrice, setCustomStandardPrice] = useState<number>(0);
   const [customPremiumPrice, setCustomPremiumPrice] = useState<number>(0);
   const [customImageUrl, setCustomImageUrl] = useState('');
+  const [customPerformance, setCustomPerformance] = useState('');
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
   // celestial photo upload states
@@ -386,6 +387,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
     setCustomStandardPrice(puja.packages.find(p => p.id === 'standard')?.price || 5100);
     setCustomPremiumPrice(puja.packages.find(p => p.id === 'premium')?.price || 11000);
     setCustomImageUrl(puja.imageUrl);
+    setCustomPerformance(puja.performance || '');
     setSaveSuccessMsg('');
   };
 
@@ -533,6 +535,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
           ...p,
           basePrice: customBasePrice,
           imageUrl: customImageUrl,
+          performance: customPerformance,
           packages: updatedPackages
         };
       }
@@ -542,7 +545,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
     setPujas(updatedPujas);
     localStorage.setItem('pooja4pandit_local_pujas', JSON.stringify(updatedPujas));
 
-    setSaveSuccessMsg('Aum! Sacred prices and photo coordinates updated successfully across all servers.');
+    setSaveSuccessMsg('Aum! Sacred prices, photo coordinates, and performance notes updated successfully across all servers.');
     setTimeout(() => setSaveSuccessMsg(''), 4000);
   };
 
@@ -1490,6 +1493,29 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                         <p className="text-[10px] text-gray-400 leading-tight">Price for multi-priest Yajna with samagri.</p>
                       </div>
 
+                    </div>
+                  </div>
+
+                  {/* Performance Notes Section */}
+                  <div className="space-y-4 border border-dashed border-gray-150 p-4 rounded-xl">
+                    
+                    <h5 className="font-bold text-gray-950 uppercase tracking-widest text-[9px] flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-saffron-600" />
+                      Puja Performance Status & Notes
+                    </h5>
+
+                    <div className="space-y-1">
+                      <label className="block text-[11px] text-gray-500 font-semibold font-sans">
+                        Performance Notes / Current Status
+                      </label>
+                      <textarea
+                        value={customPerformance}
+                        onChange={(e) => setCustomPerformance(e.target.value)}
+                        placeholder="e.g., Completed on 2026-06-07 for 50+ families | Next batch scheduled for Purnima"
+                        rows={3}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-saffron-500 focus:outline-none font-sans"
+                      />
+                      <p className="text-[10px] text-gray-400 leading-tight">Add custom status updates, completion dates, or scheduling information for this puja.</p>
                     </div>
                   </div>
 

@@ -159,20 +159,18 @@ export default function Navbar({
             )}
 
             {/* Admin Link */}
-            {(currentUser?.isAdmin || currentUser?.email === 'vsvikash290@gmail.com' || currentUser?.email === 'vikas.savita@smollan.com') && (
-              <button
-                id="nav-admin-btn"
-                onClick={() => handleTabClick('admin')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 relative cursor-pointer ${
-                  activeTab === 'admin'
-                    ? 'bg-saffron-50 text-saffron-700 border-b-2 border-saffron-500 font-bold'
-                    : 'text-gray-600 hover:text-saffron-600 hover:bg-saffron-50/50'
-                }`}
-              >
-                <Lock className="w-4 h-4 text-saffron-500" />
-                <span>Admin Portal</span>
-              </button>
-            )}
+            <button
+              id="nav-admin-btn"
+              onClick={() => handleTabClick('admin')}
+              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 relative cursor-pointer ${
+                activeTab === 'admin'
+                  ? 'bg-saffron-50 text-saffron-700 border-b-2 border-saffron-500 font-bold'
+                  : 'text-gray-600 hover:text-saffron-600 hover:bg-saffron-50/50'
+              }`}
+            >
+              <Lock className="w-4 h-4 text-saffron-500" />
+              <span>Admin Portal</span>
+            </button>
 
             {/* Devotee Profile/Login Status */}
             {currentUser ? (
@@ -300,19 +298,17 @@ export default function Navbar({
             )}
 
             {/* Admin Portal Tab */}
-            {(currentUser?.isAdmin || currentUser?.email === 'vsvikash290@gmail.com' || currentUser?.email === 'vikas.savita@smollan.com') && (
-              <button
-                onClick={() => handleTabClick('admin')}
-                className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-3 transition-colors ${
-                  activeTab === 'admin'
-                    ? 'bg-saffron-500 text-white shadow-xs'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <Lock className="w-4 h-4 animate-pulse text-amber-500" />
-                <span>Admin Portal</span>
-              </button>
-            )}
+            <button
+              onClick={() => handleTabClick('admin')}
+              className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-3 transition-colors ${
+                activeTab === 'admin'
+                  ? 'bg-saffron-500 text-white shadow-xs'
+                  : 'text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Lock className="w-4 h-4 animate-pulse text-amber-500" />
+              <span>Admin Portal</span>
+            </button>
 
             {/* User authentication block for mobile */}
             <div className="border-t border-gray-100 pt-2.5 mt-2">
