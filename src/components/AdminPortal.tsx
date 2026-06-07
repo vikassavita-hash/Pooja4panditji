@@ -1553,6 +1553,214 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
         </div>
       )}
 
+      {/* ADMIN SUB-TAB 2: SACRED GALLERY MANAGEMENT */}
+      {adminSubTab === 'gallery_mgmt' && (
+        <div className="bg-white rounded-xl border border-saffron-100 shadow-md p-5 sm:p-6 animate-fadeIn space-y-6">
+          
+          <div className="border-b border-gray-150 pb-4">
+            <h4 className="text-base font-extrabold text-gray-900 font-display">Sacred Gallery Management</h4>
+            <p className="text-xs text-gray-500">Manage photos and videos of completed Pujas, Havans, and Yajnas performed for devotees.</p>
+          </div>
+
+          {gallerySaveSuccess && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-sm font-medium">
+              ✓ {gallerySaveSuccess}
+            </div>
+          )}
+
+          {/* Gallery Item Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {gallery.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => {
+                  setSelectedGalleryItem(item);
+                  setEditGalleryTitle(item.title);
+                  setEditGalleryDesc(item.description);
+                  setEditGalleryDate(item.date);
+                  setEditGalleryImage(item.imageUrl);
+                  setEditGalleryVideo(item.videoUrl || '');
+                }}
+                className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                  selectedGalleryItem?.id === item.id
+                    ? 'border-saffron-600 bg-saffron-50/30'
+                    : 'border-gray-200 hover:border-saffron-300'
+                }`}
+              >
+                <img
+                  src={item.imageUrl}
+                  alt={item.title}
+                  className="w-full h-32 object-cover rounded-lg mb-3"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1620121692029-d088224ddc74?auto=format&fit=crop&q=80&w=200';
+                  }}
+                />
+                <h5 className="font-bold text-sm text-gray-900 line-clamp-2">{item.title}</h5>
+                <p className="text-xs text-gray-500 mt-1 line-clamp-2">{item.description}</p>
+                <p className="text-[10px] text-gray-400 mt-2">📅 {item.date}</p>
+              </div>
+            ))}
+          </div>
+
+          {gallery.length === 0 && (
+            <div className="text-center py-12 bg-gray-50 rounded-xl">
+              <p className="text-gray-500 text-sm">No performed pujas recorded yet.</p>
+            </div>
+          )}
+
+          {/* Edit or Add Form */}
+          <div className="border-t border-gray-150 pt-6">
+            {selectedGalleryItem ? (
+              <form onSubmit={handleSaveGalleryChanges} className="space-y-4">
+                <h5 className="font-bold text-gray-900 text-sm">Edit Performed Puja</h5>
+                
+                <div className="space-y-2">
+                  <label className="block text-[11px] font-semibold text-gray-600">Title</label>
+                  <input
+                    type="text"
+                    value={editGalleryTitle}
+                    onChange={(e) => setEditGalleryTitle(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[11px] font-semibold text-gray-600">Description</label>
+                  <textarea
+                    value={editGalleryDesc}
+                    onChange={(e) => setEditGalleryDesc(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="block text-[11px] font-semibold text-gray-600">Date Performed</label>
+                    <input
+                      type="date"
+                      value={editGalleryDate}
+                      onChange={(e) => setEditGalleryDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-[11px] font-semibold text-gray-600">Image URL</label>
+                    <input
+                      type="url"
+                      value={editGalleryImage}
+                      onChange={(e) => setEditGalleryImage(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[11px] font-semibold text-gray-600">Video URL (Optional)</label>
+                  <input
+                    type="url"
+                    value={editGalleryVideo}
+                    onChange={(e) => setEditGalleryVideo(e.target.value)}
+                    placeholder="YouTube embed URL"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-3">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-saffron-600 hover:bg-saffron-700 text-white font-bold py-2 rounded-lg transition"
+                  >
+                    Save Changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteGalleryItem(selectedGalleryItem.id)}
+                    className="bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 font-bold py-2 px-4 rounded-lg transition"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedGalleryItem(null)}
+                    className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-2 px-4 rounded-lg transition"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleCreateGalleryItem} className="space-y-4">
+                <h5 className="font-bold text-gray-900 text-sm">Add New Performed Puja</h5>
+                
+                <div className="space-y-2">
+                  <label className="block text-[11px] font-semibold text-gray-600">Title</label>
+                  <input
+                    type="text"
+                    value={newGalleryTitle}
+                    onChange={(e) => setNewGalleryTitle(e.target.value)}
+                    placeholder="e.g., Maha Rudrabhishek Yajna at Kashi Temple"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[11px] font-semibold text-gray-600">Description</label>
+                  <textarea
+                    value={newGalleryDesc}
+                    onChange={(e) => setNewGalleryDesc(e.target.value)}
+                    rows={3}
+                    placeholder="Describe the puja performance..."
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="block text-[11px] font-semibold text-gray-600">Date Performed</label>
+                    <input
+                      type="date"
+                      value={newGalleryDate}
+                      onChange={(e) => setNewGalleryDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-[11px] font-semibold text-gray-600">Image URL</label>
+                    <input
+                      type="url"
+                      value={newGalleryImage}
+                      onChange={(e) => setNewGalleryImage(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-[11px] font-semibold text-gray-600">Video URL (Optional)</label>
+                  <input
+                    type="url"
+                    value={newGalleryVideo}
+                    onChange={(e) => setNewGalleryVideo(e.target.value)}
+                    placeholder="YouTube embed URL"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-saffron-600 hover:bg-saffron-700 text-white font-bold py-2 rounded-lg transition"
+                >
+                  Add to Gallery
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ADMIN SUB-TAB 3: GLOBAL SUPPORT HELPLINE & SECRET CODES KEY CONFIG */}
       {adminSubTab === 'settings' && (
         <div className="bg-white rounded-xl border border-saffron-100 shadow-md p-5 sm:p-6 animate-fadeIn space-y-6 max-w-4xl">
