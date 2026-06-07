@@ -179,8 +179,14 @@ export default function App() {
     }
   }, [currentUser]);
 
+  // Track initial sync to prevent infinite loops
+  const hasInitialSyncedRef = useRef(false);
+
   // Initial Fetch synchronizer on Mount to pull latest persistent backend data
   useEffect(() => {
+    if (hasInitialSyncedRef.current) return; // Only run once
+    hasInitialSyncedRef.current = true;
+
     async function syncBackendData() {
       try {
         // 1. Sync Settings
