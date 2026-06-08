@@ -502,6 +502,59 @@ app.post("/api/bookings", async (req, res) => {
   res.json({ success: true, bookings: req.body });
 });
 
+// In-memory store for CAPTCHA challenges (per session)
+const captchaSessions = new Map<string, { challenge: string; answer: number; timestamp: number }>();
+
+// Simple in-house captcha challenge generator for payment flow
+app.post('/api/captcha-challenge', async (req, res) => {
+  try {
+    // Simple arithmetic challenge
+    const a = Math.floor(Math.random() * 9) + 1;
+    const b = Math.floor(Math.random() * 9) + 1;
+    const answer = a + b;
+    const challenge = `${a} + ${b}`;
+    const sessionId = `captcha-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    
+    // Store answer in memory with 10-minute TTL
+    captchaSessions.set(sessionId, { challenge, answer, timestamp: Date.now() });
+    
+    // Auto-cleanup old sessions
+    const now = Date.now();
+    for (const [key, val] of captchaSessions.entries()) {
+      if (now - val.timestamp > 10 * 60 * 1000) captchaSessions.delete(key);
+    }
+    
+    res.json({ success: true, challenge, sessionId, hint: 'Please compute the sum.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to generate challenge.' });
+  }
+});
+
+// CAPTCHA verification endpoint
+app.post('/api/captcha-verify', async (req, res) => {
+  try {
+    const { answer, sessionId } = req.body;
+    
+    if (!sessionId || !captchaSessions.has(sessionId)) {
+      return res.json({ success: false, error: 'Session expired or invalid. Please retry payment.' });
+    }
+    
+    const session = captchaSessions.get(sessionId)!;
+    const userAnswer = parseInt(answer, 10);
+    
+    if (isNaN(userAnswer) || userAnswer !== session.answer) {
+      return res.json({ success: false, error: 'Incorrect answer. Please try again.' });
+    }
+    
+    // Valid CAPTCHA - remove session and return success
+    captchaSessions.delete(sessionId);
+    res.json({ success: true, message: 'Payment verified successfully.' });
+  } catch (err) {
+    console.error('[CAPTCHA] Verification error:', err);
+    res.status(500).json({ success: false, error: 'Verification failed.' });
+  }
+});
+
 app.get("/api/email-logs", async (req, res) => {
   res.json(await mysqlGetEmailLogs([]));
 });

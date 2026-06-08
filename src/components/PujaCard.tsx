@@ -9,6 +9,22 @@ interface PujaCardProps {
 
 export default function PujaCard({ puja, onBook }: PujaCardProps) {
   const [showMantra, setShowMantra] = useState(false);
+  const rootRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          el.classList.add('in-view');
+          obs.unobserve(el);
+        }
+      });
+    }, { threshold: 0.18 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const getCategoryColor = (category: string) => {
     switch (category) {
@@ -21,7 +37,7 @@ export default function PujaCard({ puja, onBook }: PujaCardProps) {
   };
 
   return (
-    <div id={`puja-card-${puja.id}`} className="bg-white rounded-2xl border border-saffron-100 shadow-md hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group">
+    <div id={`puja-card-${puja.id}`} ref={rootRef} className="reveal-on-scroll bg-white rounded-2xl border border-saffron-100 shadow-md hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group">
       
       {/* Visual Header */}
       <div className="relative h-48 w-full overflow-hidden">

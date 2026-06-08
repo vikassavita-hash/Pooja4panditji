@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>CAPTCHA Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        input { padding: 8px; margin: 5px; width: 200px; }
+        pre { background: #f5f5f5; padding: 10px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>CAPTCHA Payment Flow Test</h1>
+    
+    <div class="section">
+        <h2>Step 1: Get Challenge</h2>
+        <button onclick="getChallenge()">Generate Challenge</button>
+        <pre id="challengeOutput"></pre>
+    </div>
+    
+    <div class="section">
+        <h2>Step 2: Verify Answer</h2>
+        <input type="text" id="answerInput" placeholder="Enter answer" />
+        <button onclick="verifyAnswer()">Verify</button>
+        <pre id="verifyOutput"></pre>
+    </div>
+    
+    <div class="section">
+        <h2>State</h2>
+        <p>Current Challenge: <strong id="currentChallenge">None</strong></p>
+        <p>Session ID: <strong id="currentSessionId">None</strong></p>
+        <p>Status: <strong id="status">Ready</strong></p>
+    </div>
+
+    <script>
+        let currentChallenge = '';
+        let currentSessionId = '';
+        
+        async function getChallenge() {
+            try {
+                document.getElementById('status').textContent = 'Fetching...';
+                const response = await fetch('/api/captcha-challenge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{}'
+                });
+                const data = await response.json();
+                document.getElementById('challengeOutput').textContent = JSON.stringify(data, null, 2);
+                
+                if (data.success && data.challenge && data.sessionId) {
+                    currentChallenge = data.challenge;
+                    currentSessionId = data.sessionId;
+                    document.getElementById('currentChallenge').textContent = currentChallenge;
+                    document.getElementById('currentSessionId').textContent = currentSessionId;
+                    document.getElementById('answerInput').focus();
+                    document.getElementById('status').textContent = 'Challenge received';
+                } else {
+                    document.getElementById('status').textContent = 'Error: ' + (data.error || 'Unknown error');
+                }
+            } catch (err) {
+                document.getElementById('challengeOutput').textContent = 'ERROR: ' + err.message;
+                document.getElementById('status').textContent = 'Error: ' + err.message;
+            }
+        }
+        
+        async function verifyAnswer() {
+            const answer = document.getElementById('answerInput').value.trim();
+            if (!answer) {
+                alert('Please enter an answer');
+                return;
+            }
+            
+            if (!currentSessionId) {
+                alert('Please get a challenge first');
+                return;
+            }
+            
+            try {
+                document.getElementById('status').textContent = 'Verifying...';
+                const response = await fetch('/api/captcha-verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answer, sessionId: currentSessionId })
+                });
+                const data = await response.json();
+                document.getElementById('verifyOutput').textContent = JSON.stringify(data, null, 2);
+                
+                if (data.success) {
+                    document.getElementById('status').textContent = 'SUCCESS: Payment verified!';
+                    document.getElementById('answerInput').value = '';
+                    currentChallenge = '';
+                    currentSessionId = '';
+                    document.getElementById('currentChallenge').textContent = 'None';
+                    document.getElementById('currentSessionId').textContent = 'None';
+                } else {
+                    document.getElementById('status').textContent = 'FAILED: ' + (data.error || 'Wrong answer');
+                }
+            } catch (err) {
+                document.getElementById('verifyOutput').textContent = 'ERROR: ' + err.message;
+                document.getElementById('status').textContent = 'Error: ' + err.message;
+            }
+        }
+        
+        // Auto-focus when page loads
+        window.onload = () => {
+            document.getElementById('status').textContent = 'Ready - Click "Generate Challenge" to start';
+        };
+    </script>
+</body>
+</html>

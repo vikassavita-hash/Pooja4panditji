@@ -89,6 +89,26 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
     document.body.removeChild(link);
   };
 
+  // Copy text to clipboard helper and UPI intent opener
+  const copyToClipboard = async (text: string, label = 'Text') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setSettingsSuccessMsg(`${label} copied to clipboard`);
+      setTimeout(() => setSettingsSuccessMsg(''), 3000);
+    } catch (err) {
+      alert('Could not copy to clipboard.');
+    }
+  };
+
+  const openUpiIntent = (upi: string) => {
+    if (!upi) {
+      alert('No UPI id configured.');
+      return;
+    }
+    const url = `upi://pay?pa=${encodeURIComponent(upi)}&pn=${encodeURIComponent(localPanditName || 'Pooja4Panditji')}`;
+    window.open(url, '_blank');
+  };
+
   const downloadCatalogCSV = () => {
     const headers = ["Puja ID", "Puja Name", "Sanskrit Name", "Category", "Base Price (INR)"];
     const rows = pujas.map(p => [
@@ -162,6 +182,33 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
       throw err;
     } finally {
       setIsUploadingPhoto(false);
+    }
+  };
+
+  // Handlers for uploading images from device (gallery/camera)
+  const handleNewGalleryFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const url = await performPhotoUpload(file);
+      setNewGalleryImage(url);
+      setGallerySaveSuccess('Image uploaded from device and set for new gallery item.');
+      setTimeout(() => setGallerySaveSuccess(''), 4000);
+    } catch (err) {
+      // performPhotoUpload sets uploadErrorMsg
+    }
+  };
+
+  const handleEditGalleryFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const url = await performPhotoUpload(file);
+      setEditGalleryImage(url);
+      setGallerySaveSuccess('Image uploaded from device and set for selected gallery item.');
+      setTimeout(() => setGallerySaveSuccess(''), 4000);
+    } catch (err) {
+      // performPhotoUpload sets uploadErrorMsg
     }
   };
 
@@ -1653,6 +1700,18 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                       onChange={(e) => setEditGalleryImage(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
                     />
+                    <div className="mt-2">
+                      <label className="block text-[11px] font-semibold text-gray-600">Or upload from device</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleEditGalleryFile}
+                        className="w-full text-sm"
+                        aria-label="Upload image from device"
+                      />
+                      {isUploadingPhoto && <p className="text-[10px] text-gray-500 mt-1">Uploading image…</p>}
+                      {uploadErrorMsg && <p className="text-[11px] text-red-600 mt-1">{uploadErrorMsg}</p>}
+                    </div>
                   </div>
                 </div>
 
@@ -1735,6 +1794,18 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                       onChange={(e) => setNewGalleryImage(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
                     />
+                    <div className="mt-2">
+                      <label className="block text-[11px] font-semibold text-gray-600">Or upload from device</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleNewGalleryFile}
+                        className="w-full text-sm"
+                        aria-label="Upload image from device"
+                      />
+                      {isUploadingPhoto && <p className="text-[10px] text-gray-500 mt-1">Uploading image…</p>}
+                      {uploadErrorMsg && <p className="text-[11px] text-red-600 mt-1">{uploadErrorMsg}</p>}
+                    </div>
                   </div>
                 </div>
 
@@ -1801,6 +1872,22 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 font-mono font-semibold"
                   />
                   <p className="text-[10px] text-gray-400">Displayed in main page navigation bar support section.</p>
+                  <div className="mt-2 flex gap-2">
+                    <a
+                      href={`tel:${localPhone}`}
+                      className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold"
+                    >
+                      Call Now
+                    </a>
+                    <a
+                      href={`https://wa.me/${(localWhatsapp || localPhone).replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold"
+                    >
+                      WhatsApp
+                    </a>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -1899,6 +1986,22 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-saffron-500 font-mono font-semibold text-gray-800"
                   />
                   <p className="text-[10px] text-gray-400 font-sans">Secure recipient VPA address for scan-to-pay checkouts.</p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(localUpiId, 'UPI ID')}
+                      className="inline-flex items-center gap-2 bg-saffron-600 hover:bg-saffron-700 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold"
+                    >
+                      Copy UPI ID
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openUpiIntent(localUpiId)}
+                      className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold"
+                    >
+                      Open in UPI App
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-1">

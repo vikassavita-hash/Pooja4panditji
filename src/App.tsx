@@ -5,7 +5,6 @@ import { PUJAS_DATA } from './data/pujas';
 import { DEFAULT_GALLERY_DATA } from './data/gallery';
 import { Puja, Booking, ChatMessage, PujaPackage, PortalSettings, UserAccount, GalleryItem } from './types';
 import AdminPortal from './components/AdminPortal';
-import ImageSlider from './components/ImageSlider';
 import AdminLogin from './components/AdminLogin';
 import { 
   Sparkles, ShieldCheck, CreditCard, Clock, MapPin, Globe, CheckCircle2, 
@@ -403,6 +402,7 @@ export default function App() {
   }, [currentUser, selectedPuja]);
   // CAPTCHA verification states (numeric challenge-response)
   const [captchaChallenge, setCaptchaChallenge] = useState<string>(''); // Server-generated math challenge
+  const [captchaSessionId, setCaptchaSessionId] = useState<string>(''); // Session ID for verification
   const [userCaptchaAnswer, setUserCaptchaAnswer] = useState('');
   const [captchaError, setCaptchaError] = useState('');
   const [lastCreatedBooking, setLastCreatedBooking] = useState<Booking | null>(null);
@@ -627,10 +627,11 @@ export default function App() {
       const res = await fetch('/api/captcha-challenge', { method: 'POST' });
       const data = await res.json();
       
-      if (data.success && data.challenge) {
+      if (data.success && data.challenge && data.sessionId) {
         setCaptchaChallenge(data.challenge);
+        setCaptchaSessionId(data.sessionId);
         setUserCaptchaAnswer('');
-        setBookingStep('captcha');
+        setBookingStep('payment'); // Show payment with CAPTCHA challenge
       } else {
         setCaptchaError('Failed to generate security challenge. Please try again.');
       }
@@ -642,9 +643,34 @@ export default function App() {
     }
   };
 
+  const handleGetNewChallenge = async () => {
+    setPaymentProcessing(true);
+    setCaptchaError('');
+    setUserCaptchaAnswer('');
+    
+    try {
+      // Request a NEW CAPTCHA challenge from server
+      const res = await fetch('/api/captcha-challenge', { method: 'POST' });
+      const data = await res.json();
+      
+      if (data.success && data.challenge && data.sessionId) {
+        setCaptchaChallenge(data.challenge);
+        setCaptchaSessionId(data.sessionId);
+        setUserCaptchaAnswer('');
+      } else {
+        setCaptchaError('Failed to generate new security challenge. Please try again.');
+      }
+    } catch (err) {
+      console.error('CAPTCHA refresh error:', err);
+      setCaptchaError('Network error requesting new challenge.');
+    } finally {
+      setPaymentProcessing(false);
+    }
+  };
+
   const handleCaptchaVerify = async () => {
     if (!userCaptchaAnswer.trim()) {
-      setCaptchaError('Please enter the verification code.');
+      setCaptchaError('Please enter the answer.');
       return;
     }
 
@@ -652,16 +678,20 @@ export default function App() {
     setCaptchaError('');
 
     try {
-      // Verify CAPTCHA server-side
+      // Verify CAPTCHA server-side with sessionId
       const verifyRes = await fetch('/api/captcha-verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answer: userCaptchaAnswer, challenge: captchaChallenge })
+        body: JSON.stringify({ 
+          answer: userCaptchaAnswer.trim(), 
+          sessionId: captchaSessionId 
+        })
       });
       const verifyData = await verifyRes.json();
 
       if (!verifyData.success) {
-        setCaptchaError('Incorrect verification code. Please try again.');
+        setCaptchaError(verifyData.error || 'Incorrect answer. Please try again.');
+        setUserCaptchaAnswer('');
         setPaymentProcessing(false);
         return;
       }
@@ -1011,11 +1041,6 @@ export default function App() {
                 </div>
               </div>
             </div>
-
-            {/* Image Slider Gallery */}
-            {gallery && gallery.length > 0 && (
-              <ImageSlider images={gallery} autoplayInterval={5000} />
-            )}
 
             {/* Puja Category Filter & Tags */}
             <div className="space-y-4" id="categories-tabs">
@@ -2256,7 +2281,7 @@ export default function App() {
 
               {/* STEP 3: SECURE TRANSACTION PAYMENT GATEWAY */}
               {bookingStep === 'payment' && selectedPuja && selectedPackage && (
-                <div className="space-y-6 animate-fadeIn" id="step-payment-gateway">
+                <div className="space-y-4 md:space-y-6 animate-fadeIn w-full max-w-full px-2 sm:px-0" id="step-payment-gateway">
                   
                   {/* Security certificate strip */}
                   <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4.5 flex gap-3 text-emerald-900 justify-between items-center">
@@ -2273,9 +2298,9 @@ export default function App() {
                   </div>
 
                   {/* Billing breakdown Receipt */}
-                  <div className="bg-gray-50 border border-gray-150 rounded-2xl p-4">
-                    <h5 className="font-extrabold text-xs text-gray-500 uppercase tracking-widest mb-2.5">Secure Order Summary</h5>
-                    <div className="space-y-1.5 text-xs text-gray-700 font-medium">
+                  <div className="bg-gray-50 border border-gray-150 rounded-xl md:rounded-2xl p-3 md:p-4">
+                    <h5 className="font-extrabold text-xs text-gray-500 uppercase tracking-widest mb-2">Secure Order Summary</h5>
+                    <div className="space-y-1 md:space-y-1.5 text-xs text-gray-700 font-medium">
                       
                       <div className="flex justify-between">
                         <span>Ritual Offering Name:</span>
@@ -2308,7 +2333,7 @@ export default function App() {
                   </div>
 
                   {/* Payment Methods tabs container */}
-                  <div className="border border-gray-150 rounded-2xl overflow-hidden flex flex-col sm:flex-row h-[280px]">
+                  <div className="border border-gray-150 rounded-xl md:rounded-2xl overflow-hidden flex flex-col sm:flex-row min-h-[320px] sm:min-h-[280px]">
                     
                     {/* Sidebar method select */}
                     <div className="w-full sm:w-1/3 bg-gray-50 border-r border-gray-150 flex flex-row sm:flex-col text-xs font-semibold">
@@ -2476,123 +2501,128 @@ export default function App() {
                       )}
 
                     </div>
+
+                    {/* Security Verification Challenge - Shows after clicking "Secure Pay" */}
+                    {captchaChallenge && !paymentProcessing && (
+                      <div className="mt-4 md:mt-6 p-4 md:p-5 bg-saffron-50 border-2 border-saffron-200 rounded-xl space-y-3 md:space-y-4 w-full">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Lock className="w-5 h-5 text-saffron-600 shrink-0" />
+                            <h5 className="font-bold text-sm md:text-base text-saffron-900">Security Challenge</h5>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleGetNewChallenge}
+                            disabled={paymentProcessing}
+                            className="text-xs md:text-sm px-2 md:px-3 py-1 md:py-1.5 bg-saffron-100 hover:bg-saffron-200 disabled:bg-saffron-100 disabled:cursor-not-allowed text-saffron-700 font-semibold rounded-lg transition duration-150 flex items-center gap-1 whitespace-nowrap"
+                            title="Get a different CAPTCHA code"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 md:w-4 md:h-4 ${paymentProcessing ? 'animate-spin' : ''}`} />
+                            <span>New Code</span>
+                          </button>
+                        </div>
+                        
+                        <p className="text-xs md:text-sm text-saffron-800">
+                          Solve this arithmetic problem to verify your payment:
+                        </p>
+                        
+                        <div className="p-3 md:p-4 bg-white border-2 border-saffron-300 rounded-lg text-center min-h-16 md:min-h-20 flex items-center justify-center">
+                          <p className="text-2xl md:text-3xl lg:text-4xl font-bold font-mono text-saffron-800 break-words">{captchaChallenge}</p>
+                          <p className="text-xs text-saffron-600 mt-2">What is the answer?</p>
+                        </div>
+
+                        <div className="space-y-2 md:space-y-3">
+                          <input
+                            id="captcha-inline-input"
+                            type="text"
+                            value={userCaptchaAnswer}
+                            onChange={(e) => {
+                              setUserCaptchaAnswer(e.target.value);
+                              setCaptchaError('');
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleCaptchaVerify();
+                              }
+                            }}
+                            placeholder="Enter answer (e.g., 7)"
+                            className="w-full text-center font-mono text-lg md:text-xl font-bold py-2.5 md:py-3 px-3 border-2 border-saffron-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500 focus:border-transparent text-base md:text-lg"
+                            autoFocus
+                            inputMode="numeric"
+                          />
+                          
+                          {captchaError && (
+                            <p className="text-xs md:text-sm font-semibold text-red-500 flex items-center gap-1">
+                              <AlertTriangle className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
+                              <span>{captchaError}</span>
+                            </p>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={paymentProcessing || !userCaptchaAnswer.trim()}
+                          onClick={handleCaptchaVerify}
+                          className="w-full bg-saffron-600 hover:bg-saffron-700 disabled:bg-saffron-300 text-white font-bold py-2.5 md:py-3 px-4 md:px-6 rounded-lg text-sm md:text-base shadow-md hover:shadow-lg transition duration-150 flex items-center justify-center gap-2 disabled:cursor-not-allowed"
+                        >
+                          {paymentProcessing ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              <span>Verifying...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Check className="w-5 h-5" />
+                              <span>Verify & Complete Payment</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Operational navigation */}
-                  <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+                  <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2 md:gap-3 pt-3 md:pt-4 border-t border-gray-100">
                     <button
                       type="button"
-                      onClick={() => setBookingStep('form')}
-                      className="text-gray-500 hover:text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl text-xs font-bold transition duration-150 cursor-pointer"
+                      onClick={() => {
+                        setBookingStep('form');
+                        setCaptchaChallenge('');
+                        setUserCaptchaAnswer('');
+                        setCaptchaError('');
+                      }}
+                      className="text-xs md:text-sm text-gray-500 hover:text-gray-700 border border-gray-200 px-3 md:px-4 py-2 md:py-2.5 rounded-lg md:rounded-xl text-center font-bold transition duration-150 cursor-pointer whitespace-nowrap"
                     >
                       Back to Devotee Form
                     </button>
 
-                    <button
-                      type="button"
-                      disabled={paymentProcessing}
-                      onClick={handlePaymentInitiate}
-                      className="bg-linear-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white font-bold px-7 py-3 rounded-xl transition duration-150 text-sm flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg disabled:opacity-50 cursor-pointer"
-                      id="init-pay-btn"
-                    >
-                      {paymentProcessing ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>Generating Encrypted SMS PIN...</span>
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheck className="w-4.5 h-4.5 text-white" />
-                          <span>Secure Pay ₹{calculateTotalPrice().toLocaleString()}</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                </div>
-              )}
-
-              {/* STEP 4: SMS OTP VERIFICATION FRAME */}
-              {bookingStep === 'captcha' && selectedPackage && (
-                <div className="space-y-6 animate-fadeIn max-w-md mx-auto text-center py-4" id="step-captcha-verification">
-                  
-                  <div className="w-14 h-14 bg-saffron-50 border border-saffron-150 rounded-full flex items-center justify-center text-saffron-700 mx-auto text-2xl shadow-sm">
-                    🔐
-                  </div>
-
-                  <div className="space-y-2">
-                    <h4 className="font-extrabold text-xl text-gray-900 font-display">Security Verification</h4>
-                    <p className="text-xs text-gray-500 leading-relaxed">
-                      Please solve this verification to confirm your sacred Dakshina payment is genuine.
-                    </p>
-                  </div>
-
-                  {/* CAPTCHA challenge display */}
-                  {captchaChallenge && (
-                    <div className="p-4 bg-white border-2 border-saffron-300 rounded-xl">
-                      <p className="text-2xl font-bold font-mono text-saffron-800">{captchaChallenge}</p>
-                      <p className="text-xs text-saffron-600 mt-2">What is the answer?</p>
-                    </div>
-                  )}
-
-                  <div className="space-y-3">
-                    <input
-                      id="captcha-input-field"
-                      type="text"
-                      value={userCaptchaAnswer}
-                      onChange={(e) => {
-                        setUserCaptchaAnswer(e.target.value);
-                        setCaptchaError('');
-                      }}
-                      placeholder="Enter your answer"
-                      className="w-3/4 mx-auto text-center font-mono text-lg font-bold py-2.5 border-2 border-saffron-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-saffron-500"
-                    />
-                    
-                    {captchaError && (
-                      <p className="text-xs font-semibold text-red-500" id="captcha-error-line">
-                        {captchaError}
-                      </p>
+                    {!captchaChallenge && (
+                      <button
+                        type="button"
+                        disabled={paymentProcessing}
+                        onClick={handlePaymentInitiate}
+                        className="bg-linear-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white font-bold px-4 md:px-7 py-2.5 md:py-3 rounded-lg md:rounded-xl transition duration-150 text-xs md:text-sm flex items-center justify-center gap-1.5 shadow-md hover:shadow-lg disabled:opacity-50 cursor-pointer"
+                        id="init-pay-btn"
+                      >
+                        {paymentProcessing ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 md:w-4 md:h-4 animate-spin" />
+                            <span>Generating Challenge...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ShieldCheck className="w-3.5 h-3.5 md:w-4.5 md:h-4.5 text-white" />
+                            <span>Secure Pay ₹{calculateTotalPrice().toLocaleString()}</span>
+                          </>
+                        )}
+                      </button>
                     )}
+
                   </div>
-
-                  <div className="pt-4 space-y-2.5">
-                    <button
-                      type="button"
-                      disabled={paymentProcessing}
-                      onClick={handleCaptchaVerify}
-                      className="w-full bg-saffron-600 hover:bg-saffron-700 text-white font-bold py-3 px-6 rounded-xl text-sm shadow-md hover:shadow-lg transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                      id="captcha-verify-submit-btn"
-                    >
-                      {paymentProcessing ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>Processing Payment...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Check className="w-4.5 h-4.5" />
-                          <span>Confirm Payment</span>
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBookingStep('payment');
-                        setCaptchaError('');
-                        setUserCaptchaAnswer('');
-                      }}
-                      className="text-xs text-gray-500 hover:text-saffron-700 transition font-bold"
-                    >
-                      ← Back to Payment
-                    </button>
-                  </div>
-
                 </div>
               )}
 
-              {/* STEP 5: BOOKING SUCCESS CELEBRATED BANNER */}
+              {/* STEP 4: BOOKING SUCCESS CELEBRATED BANNER */}
               {bookingStep === 'success' && lastCreatedBooking && (
                 <div className="space-y-6 animate-fadeIn py-6 text-center max-w-lg mx-auto" id="step-booking-success">
                   

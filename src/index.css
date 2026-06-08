@@ -47,3 +47,25 @@ html, body {
 .holy-glow-effect {
   animation: holy-glow 4s infinite ease-in-out;
 }
+
+/* Modern slider parallax and caption animations */
+.slider-parallax { perspective: 1200px; }
+.slider-slide-img { transition: transform 900ms cubic-bezier(.2,.9,.2,1), filter 700ms; will-change: transform; }
+.slider-caption { transform: translateY(18px); opacity: 0; transition: transform 600ms ease, opacity 600ms ease; }
+.slider-slide-active .slider-caption { transform: translateY(0); opacity: 1; }
+
+/* Reveal-on-scroll for cards */
+.reveal-on-scroll { transform: translateY(18px) scale(.995); opacity: 0; transition: transform 700ms cubic-bezier(.2,.9,.2,1), opacity 700ms ease; will-change: transform, opacity; }
+.reveal-on-scroll.in-view { transform: translateY(0) scale(1); opacity: 1; }
+
+/* Slight modern glass effect for slider dots */
+.slider-dot { transition: all 300ms ease; }
+.slider-dot.active { transform: scale(1.2); box-shadow: 0 6px 18px rgba(16,24,40,0.12); }
+
+/* Chakra spinner animation */
+@keyframes chakra-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.chakra-spin { animation: chakra-spin 10s linear infinite; }
+.chakra-ring { filter: drop-shadow(0 8px 18px rgba(31,41,55,0.12)); }
