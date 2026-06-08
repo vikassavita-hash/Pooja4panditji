@@ -401,9 +401,10 @@ export default function App() {
       setSankalpNames(currentUser.fullName + ' & Family');
     }
   }, [currentUser, selectedPuja]);
-  const [sentOtpCode, setSentOtpCode] = useState('1008'); // Highly sacred OTP default 
-  const [userOtp, setUserOtp] = useState('');
-  const [otpError, setOtpError] = useState('');
+  // CAPTCHA verification states (numeric challenge-response)
+  const [captchaChallenge, setCaptchaChallenge] = useState<string>(''); // Server-generated math challenge
+  const [userCaptchaAnswer, setUserCaptchaAnswer] = useState('');
+  const [captchaError, setCaptchaError] = useState('');
   const [lastCreatedBooking, setLastCreatedBooking] = useState<Booking | null>(null);
   
   // Interactive live virtual altar state (modal)
@@ -617,36 +618,59 @@ export default function App() {
     return base;
   };
 
-  const handlePaymentInitiate = () => {
+  const handlePaymentInitiate = async () => {
     setPaymentProcessing(true);
+    setCaptchaError('');
     
-    // Simulate transaction security handshake
-    setTimeout(() => {
+    try {
+      // Request a CAPTCHA challenge from server
+      const res = await fetch('/api/captcha-challenge', { method: 'POST' });
+      const data = await res.json();
+      
+      if (data.success && data.challenge) {
+        setCaptchaChallenge(data.challenge);
+        setUserCaptchaAnswer('');
+        setBookingStep('captcha');
+      } else {
+        setCaptchaError('Failed to generate security challenge. Please try again.');
+      }
+    } catch (err) {
+      console.error('CAPTCHA challenge error:', err);
+      setCaptchaError('Network error requesting security challenge.');
+    } finally {
       setPaymentProcessing(false);
-      // Send interactive OTP
-      setBookingStep('otp');
-      // Set OTP to highly devotional/auspicious numbers
-      const sacredOTPs = ['1008', '108', '777', '511'];
-      const randomSeed = sacredOTPs[Math.floor(Math.random() * sacredOTPs.length)];
-      setSentOtpCode(randomSeed);
-    }, 1500);
+    }
   };
 
-  const handleOtpVerify = () => {
-    if (userOtp !== sentOtpCode) {
-      setOtpError(`The verification OTP code does not match. (Tip: Enter the secret OTP code: "${sentOtpCode}")`);
+  const handleCaptchaVerify = async () => {
+    if (!userCaptchaAnswer.trim()) {
+      setCaptchaError('Please enter the verification code.');
       return;
     }
 
     setPaymentProcessing(true);
-    setOtpError('');
+    setCaptchaError('');
 
-    setTimeout(() => {
-      setPaymentProcessing(false);
-      
+    try {
+      // Verify CAPTCHA server-side
+      const verifyRes = await fetch('/api/captcha-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer: userCaptchaAnswer, challenge: captchaChallenge })
+      });
+      const verifyData = await verifyRes.json();
+
+      if (!verifyData.success) {
+        setCaptchaError('Incorrect verification code. Please try again.');
+        setPaymentProcessing(false);
+        return;
+      }
+
+      // CAPTCHA verified; proceed to create booking
       if (!selectedPuja || !selectedPackage) {
         alert('Please choose a puja and package before confirming payment.');
         setBookingStep('package');
+        setPaymentProcessing(false);
         return;
       }
 
@@ -681,10 +705,28 @@ export default function App() {
         otpVerified: true
       };
 
+      // Save booking
       setBookings(prev => [newBooking, ...prev]);
       setLastCreatedBooking(newBooking);
+      
+      // Send booking confirmation email
+      try {
+        await fetch('/api/send-booking-confirmation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newBooking)
+        });
+      } catch (emailErr) {
+        console.warn('Email confirmation send delayed:', emailErr);
+      }
+
       setBookingStep('success');
-    }, 1200);
+    } catch (err) {
+      console.error('CAPTCHA verification error:', err);
+      setCaptchaError('Network error during verification. Please try again.');
+    } finally {
+      setPaymentProcessing(false);
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -1885,7 +1927,7 @@ export default function App() {
                     ? 'text-saffron-600 border-saffron-500 font-bold' 
                     : (bookingStep === 'form' && step.id === 'package') || 
                       (bookingStep === 'payment' && (step.id === 'package' || step.id === 'form')) ||
-                      (bookingStep === 'otp' && step.id !== 'otp')
+                      (bookingStep === 'captcha' && step.id !== 'captcha')
                       ? 'text-green-600 border-green-500 font-bold'
                       : 'border-transparent text-gray-400'
                   }`}
@@ -2471,43 +2513,44 @@ export default function App() {
               )}
 
               {/* STEP 4: SMS OTP VERIFICATION FRAME */}
-              {bookingStep === 'otp' && selectedPackage && (
-                <div className="space-y-6 animate-fadeIn max-w-md mx-auto text-center py-4" id="step-otp-verification">
+              {bookingStep === 'captcha' && selectedPackage && (
+                <div className="space-y-6 animate-fadeIn max-w-md mx-auto text-center py-4" id="step-captcha-verification">
                   
                   <div className="w-14 h-14 bg-saffron-50 border border-saffron-150 rounded-full flex items-center justify-center text-saffron-700 mx-auto text-2xl shadow-sm">
-                    🔒
+                    🔐
                   </div>
 
                   <div className="space-y-2">
-                    <h4 className="font-extrabold text-xl text-gray-900 font-display">Vedic OTP Code Required</h4>
+                    <h4 className="font-extrabold text-xl text-gray-900 font-display">Security Verification</h4>
                     <p className="text-xs text-gray-500 leading-relaxed">
-                      A simulated 4-digit security code was dispatched to your hosted phone: <strong className="text-gray-800 font-semibold">{customerPhone || "+91 98765 43210"}</strong> for instant authentication.
+                      Please solve this verification to confirm your sacred Dakshina payment is genuine.
                     </p>
                   </div>
 
-                  {/* Informational tip displaying the sacred OTP */}
-                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 leading-normal">
-                    <span className="font-bold">✨ Spiritual SMS Mock Gateway Notification:</span>
-                    <p className="font-mono text-xs font-extrabold text-saffron-700 mt-1">"Your Pooja4Panditji transaction private OTP is: {sentOtpCode}"</p>
-                  </div>
+                  {/* CAPTCHA challenge display */}
+                  {captchaChallenge && (
+                    <div className="p-4 bg-white border-2 border-saffron-300 rounded-xl">
+                      <p className="text-2xl font-bold font-mono text-saffron-800">{captchaChallenge}</p>
+                      <p className="text-xs text-saffron-600 mt-2">What is the answer?</p>
+                    </div>
+                  )}
 
                   <div className="space-y-3">
                     <input
-                      id="otp-input-field"
+                      id="captcha-input-field"
                       type="text"
-                      maxLength={4}
-                      value={userOtp}
+                      value={userCaptchaAnswer}
                       onChange={(e) => {
-                        setUserOtp(e.target.value);
-                        setOtpError('');
+                        setUserCaptchaAnswer(e.target.value);
+                        setCaptchaError('');
                       }}
-                      placeholder="Enter 4-digit Code"
-                      className="w-1/2 mx-auto text-center tracking-[0.5em] font-mono text-xl font-bold py-2.5 border-2 border-saffron-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-saffron-500"
+                      placeholder="Enter your answer"
+                      className="w-3/4 mx-auto text-center font-mono text-lg font-bold py-2.5 border-2 border-saffron-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-saffron-500"
                     />
                     
-                    {otpError && (
-                      <p className="text-xs font-semibold text-red-500" id="otp-error-line">
-                        {otpError}
+                    {captchaError && (
+                      <p className="text-xs font-semibold text-red-500" id="captcha-error-line">
+                        {captchaError}
                       </p>
                     )}
                   </div>
@@ -2516,19 +2559,19 @@ export default function App() {
                     <button
                       type="button"
                       disabled={paymentProcessing}
-                      onClick={handleOtpVerify}
+                      onClick={handleCaptchaVerify}
                       className="w-full bg-saffron-600 hover:bg-saffron-700 text-white font-bold py-3 px-6 rounded-xl text-sm shadow-md hover:shadow-lg transition duration-150 flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                      id="otp-verify-submit-btn"
+                      id="captcha-verify-submit-btn"
                     >
                       {paymentProcessing ? (
                         <>
                           <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>Encrypting Dakshina Hashing Ledger...</span>
+                          <span>Processing Payment...</span>
                         </>
                       ) : (
                         <>
                           <Check className="w-4.5 h-4.5" />
-                          <span>Verify & Authorize Safe Ritual</span>
+                          <span>Confirm Payment</span>
                         </>
                       )}
                     </button>
@@ -2536,11 +2579,13 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => {
-                        alert(`A new sacred OTP PIN was dispatched securely to your device. Try: ${sentOtpCode}`);
+                        setBookingStep('payment');
+                        setCaptchaError('');
+                        setUserCaptchaAnswer('');
                       }}
                       className="text-xs text-gray-500 hover:text-saffron-700 transition font-bold"
                     >
-                      Resend SMS OTP Gateway Code
+                      ← Back to Payment
                     </button>
                   </div>
 
