@@ -1200,7 +1200,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                   <div className="space-y-1">
                     <label className="block text-[10px] uppercase font-bold text-gray-500 font-bold">Deity Photo Link URL</label>
                     <input
-                      type="url"
+                      type="text"
                       required
                       value={newPujaImage}
                       onChange={(e) => setNewPujaImage(e.target.value)}
@@ -1341,11 +1341,11 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                     </label>
                     <input
                       id="edit-puja-img-url"
-                      type="url"
+                      type="text"
                       required
                       value={customImageUrl}
                       onChange={(e) => setCustomImageUrl(e.target.value)}
-                      placeholder="Enter photo link URL (https://...)"
+                      placeholder="Enter photo link URL or upload path (https://... or /uploads/...)"
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-saffron-500 focus:outline-none"
                     />
 
@@ -1648,7 +1648,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                   <div className="space-y-2">
                     <label className="block text-[11px] font-semibold text-gray-600">Image URL</label>
                     <input
-                      type="url"
+                      type="text"
                       value={editGalleryImage}
                       onChange={(e) => setEditGalleryImage(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
@@ -1659,7 +1659,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                 <div className="space-y-2">
                   <label className="block text-[11px] font-semibold text-gray-600">Video URL (Optional)</label>
                   <input
-                    type="url"
+                    type="text"
                     value={editGalleryVideo}
                     onChange={(e) => setEditGalleryVideo(e.target.value)}
                     placeholder="YouTube embed URL"
@@ -1730,7 +1730,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                   <div className="space-y-2">
                     <label className="block text-[11px] font-semibold text-gray-600">Image URL</label>
                     <input
-                      type="url"
+                      type="text"
                       value={newGalleryImage}
                       onChange={(e) => setNewGalleryImage(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-saffron-500"
@@ -1741,7 +1741,7 @@ export default function AdminPortal({ bookings, setBookings, pujas, setPujas, se
                 <div className="space-y-2">
                   <label className="block text-[11px] font-semibold text-gray-600">Video URL (Optional)</label>
                   <input
-                    type="url"
+                    type="text"
                     value={newGalleryVideo}
                     onChange={(e) => setNewGalleryVideo(e.target.value)}
                     placeholder="YouTube embed URL"
