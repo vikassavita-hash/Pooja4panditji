@@ -5,6 +5,8 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import nodemailer from "nodemailer";
+import Razorpay from "razorpay";
+import crypto from "crypto";
 import { createPool, Pool, PoolConnection } from "mysql2/promise";
 import { PUJAS_DATA } from "./src/data/pujas";
 import { DEFAULT_GALLERY_DATA } from "./src/data/gallery";
@@ -15,6 +17,29 @@ const app = express();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 const PORT = 3000;
+
+// ===== Razorpay Configuration =====
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || 'test_secret_placeholder'
+});
+
+// ===== Email Configuration (SMTP) =====
+const emailTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'localhost',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+  auth: process.env.SMTP_USER ? {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  } : undefined
+});
+
+// Verify email transporter
+emailTransporter.verify().catch(err => {
+  console.warn('[Email] SMTP configuration warning:', err.message);
+  console.warn('[Email] Emails will not be sent. Configure SMTP in .env file.');
+});
 
 // Setup persistent JSON file-based database fallback
 const DB_DIR = path.join(process.cwd(), "db");
@@ -552,6 +577,262 @@ app.post('/api/captcha-verify', async (req, res) => {
   } catch (err) {
     console.error('[CAPTCHA] Verification error:', err);
     res.status(500).json({ success: false, error: 'Verification failed.' });
+  }
+});
+
+// ===== RAZORPAY PAYMENT ENDPOINTS =====
+
+// Helper: Send booking confirmation email
+async function sendBookingConfirmation(booking: any) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.log('[Email] Skipped (SMTP not configured). Booking:', booking.id);
+    return false;
+  }
+  
+  try {
+    const meetingLink = booking.meetingLink ? `<p><strong>Meeting Link:</strong> <a href="${booking.meetingLink}">${booking.meetingLink}</a></p>` : '';
+    const addressLine = booking.address ? `<p><strong>Address:</strong> ${booking.address}</p>` : '';
+    
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; padding: 20px; border-radius: 8px;">
+        <h1 style="color: #D97706; text-align: center;">🙏 Puja Booking Confirmation</h1>
+        <p>Dear <strong>${booking.customerName}</strong>,</p>
+        <p>Your puja booking has been confirmed and payment has been received. Here are your booking details:</p>
+        
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+        
+        <h2 style="color: #1F2937; font-size: 18px;">Booking Details</h2>
+        <p><strong>Booking ID:</strong> ${booking.id}</p>
+        <p><strong>Puja:</strong> ${booking.pujaName}</p>
+        <p><strong>Package:</strong> ${booking.packageName}</p>
+        <p><strong>Date & Time:</strong> ${new Date(booking.dateTime).toLocaleString()}</p>
+        <p><strong>Mode:</strong> ${booking.mode.replace('-', ' ').toUpperCase()}</p>
+        <p><strong>Language:</strong> ${booking.language}</p>
+        ${addressLine}
+        ${meetingLink}
+        
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+        
+        <h2 style="color: #1F2937; font-size: 18px;">Payment Details</h2>
+        <p><strong>Amount Paid:</strong> ₹${booking.price.toLocaleString('en-IN')}</p>
+        <p><strong>Payment ID:</strong> ${booking.razorpayPaymentId || booking.paymentId || 'N/A'}</p>
+        <p><strong>Payment Date:</strong> ${booking.paidAt ? new Date(booking.paidAt).toLocaleString() : new Date().toLocaleString()}</p>
+        
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+        
+        <h2 style="color: #1F2937; font-size: 18px;">Devotee Information</h2>
+        <p><strong>Name:</strong> ${booking.customerName}</p>
+        <p><strong>Gothra:</strong> ${booking.gothra || 'Not specified'}</p>
+        <p><strong>Nakshatra:</strong> ${booking.nakshatra || 'Not specified'}</p>
+        <p><strong>Sankalp Names:</strong> ${booking.sankalpNames || 'Not specified'}</p>
+        
+        <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+        
+        <p style="text-align: center; color: #6B7280; font-size: 14px;">
+          Thank you for choosing Pooja4Panditji. Your puja will be performed as per Vedic rituals.<br>
+          For any queries, please contact us at +91 84450 30767
+        </p>
+        <p style="text-align: center; color: #9CA3AF; font-size: 12px;">
+          This is an automated email. Please do not reply.
+        </p>
+      </div>
+    `;
+    
+    const info = await emailTransporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: booking.customerEmail,
+      subject: `✨ Puja Booking Confirmed - ${booking.pujaName} (Booking ID: ${booking.id})`,
+      html: htmlContent
+    });
+    
+    console.log('[Email] Confirmation sent to', booking.customerEmail, '- Message ID:', info.messageId);
+    return true;
+  } catch (err) {
+    console.error('[Email] Failed to send confirmation:', err);
+    return false;
+  }
+}
+
+// Create Razorpay Order
+app.post('/api/create-payment', async (req, res) => {
+  try {
+    const { bookingId, amount, currency = 'INR', customerEmail, customerName } = req.body;
+    
+    if (!bookingId || !amount || !customerEmail) {
+      return res.status(400).json({ success: false, error: 'Missing required fields: bookingId, amount, customerEmail' });
+    }
+    
+    // Validate amount server-side (must be in paise for Razorpay)
+    const amountInPaise = Math.round(amount * 100);
+    if (amountInPaise < 100) {
+      return res.status(400).json({ success: false, error: 'Minimum amount is ₹1.00' });
+    }
+    
+    // Create Razorpay order
+    const order = await razorpay.orders.create({
+      amount: amountInPaise,
+      currency,
+      receipt: `booking_${bookingId}`,
+      notes: {
+        bookingId,
+        customerName,
+        customerEmail
+      }
+    });
+    
+    console.log('[Razorpay] Order created:', order.id, 'for booking:', bookingId);
+    
+    res.json({
+      success: true,
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key: process.env.RAZORPAY_KEY_ID
+    });
+  } catch (err) {
+    console.error('[Razorpay] Order creation failed:', err);
+    res.status(500).json({ success: false, error: 'Failed to create payment order' });
+  }
+});
+
+// Razorpay Webhook Handler
+app.post('/api/webhook/razorpay', async (req, res) => {
+  try {
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    const signature = req.headers['x-razorpay-signature'] as string;
+    const body = JSON.stringify(req.body);
+    
+    // Verify webhook signature
+    if (webhookSecret && signature) {
+      const hash = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(body)
+        .digest('hex');
+      
+      if (hash !== signature) {
+        console.warn('[Webhook] Invalid signature received');
+        return res.status(400).json({ success: false, error: 'Invalid signature' });
+      }
+    } else {
+      console.warn('[Webhook] No webhook secret configured - skipping signature verification');
+    }
+    
+    const event = req.body.event;
+    const eventData = req.body.payload?.payment?.entity || req.body.payload?.order?.entity || {};
+    
+    console.log('[Webhook] Event received:', event);
+    
+    if (event === 'payment.authorized' || event === 'payment.captured') {
+      const paymentId = eventData.id;
+      const orderId = eventData.order_id;
+      const receipt = eventData.receipt;
+      const notes = eventData.notes || {};
+      const bookingId = notes.bookingId;
+      
+      if (!bookingId) {
+        console.warn('[Webhook] No bookingId found in payment notes');
+        return res.status(400).json({ success: false, error: 'No bookingId in notes' });
+      }
+      
+      // Get all bookings and find the one to update
+      const bookings = await mysqlGetCollection('bookings', 'bookings.json', []);
+      const bookingIndex = bookings.findIndex((b: any) => b.id === bookingId);
+      
+      if (bookingIndex === -1) {
+        console.warn('[Webhook] Booking not found:', bookingId);
+        return res.status(404).json({ success: false, error: 'Booking not found' });
+      }
+      
+      // Update booking with payment details
+      const booking = bookings[bookingIndex];
+      booking.status = 'paid';
+      booking.paymentStatus = 'paid';
+      booking.razorpayPaymentId = paymentId;
+      booking.razorpayOrderId = orderId;
+      booking.paidAt = new Date().toISOString();
+      booking.paymentId = paymentId;
+      booking.paymentMethod = 'Razorpay';
+      
+      // Save updated bookings
+      await mysqlSaveCollection('bookings', 'bookings.json', bookings, 'id');
+      
+      // Send confirmation email
+      await sendBookingConfirmation(booking);
+      
+      console.log('[Webhook] Booking marked as paid:', bookingId);
+      return res.json({ success: true, message: 'Payment confirmed' });
+    }
+    
+    if (event === 'payment.failed') {
+      const paymentId = eventData.id;
+      const orderId = eventData.order_id;
+      const notes = eventData.notes || {};
+      const bookingId = notes.bookingId;
+      
+      const bookings = await mysqlGetCollection('bookings', 'bookings.json', []);
+      const bookingIndex = bookings.findIndex((b: any) => b.id === bookingId);
+      
+      if (bookingIndex !== -1) {
+        bookings[bookingIndex].status = 'failed';
+        bookings[bookingIndex].paymentStatus = 'failed';
+        await mysqlSaveCollection('bookings', 'bookings.json', bookings, 'id');
+        console.log('[Webhook] Booking marked as failed:', bookingId);
+      }
+      
+      return res.json({ success: true, message: 'Payment failure recorded' });
+    }
+    
+    res.json({ success: true, message: 'Event processed' });
+  } catch (err) {
+    console.error('[Webhook] Error processing webhook:', err);
+    res.status(500).json({ success: false, error: 'Webhook processing failed' });
+  }
+});
+
+// Verify Payment (fallback for checking payment status)
+app.post('/api/verify-payment', async (req, res) => {
+  try {
+    const { razorpayOrderId, razorpayPaymentId, razorpaySignature, bookingId } = req.body;
+    
+    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+      return res.status(400).json({ success: false, error: 'Missing payment details' });
+    }
+    
+    // Verify signature
+    const signature = crypto
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
+      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+      .digest('hex');
+    
+    if (signature !== razorpaySignature) {
+      return res.json({ success: false, error: 'Invalid payment signature' });
+    }
+    
+    // Update booking if bookingId provided
+    if (bookingId) {
+      const bookings = await mysqlGetCollection('bookings', 'bookings.json', []);
+      const bookingIndex = bookings.findIndex((b: any) => b.id === bookingId);
+      
+      if (bookingIndex !== -1) {
+        bookings[bookingIndex].status = 'paid';
+        bookings[bookingIndex].paymentStatus = 'paid';
+        bookings[bookingIndex].razorpayPaymentId = razorpayPaymentId;
+        bookings[bookingIndex].razorpayOrderId = razorpayOrderId;
+        bookings[bookingIndex].paidAt = new Date().toISOString();
+        
+        await mysqlSaveCollection('bookings', 'bookings.json', bookings, 'id');
+        
+        // Send confirmation email
+        await sendBookingConfirmation(bookings[bookingIndex]);
+        
+        console.log('[Payment] Verified and booking updated:', bookingId);
+      }
+    }
+    
+    res.json({ success: true, message: 'Payment verified' });
+  } catch (err) {
+    console.error('[Payment] Verification failed:', err);
+    res.status(500).json({ success: false, error: 'Payment verification failed' });
   }
 });
 

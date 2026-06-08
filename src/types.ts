@@ -57,12 +57,17 @@ export interface Booking {
   address?: string; // for home puja
   includeSamagriKit: boolean;
   notes?: string;
-  status: 'pending-payment' | 'confirmed' | 'completed' | 'cancelled';
+  status: 'pending-payment' | 'confirmed' | 'completed' | 'cancelled' | 'paid';
   paymentId?: string;
   paymentMethod?: string;
   meetingLink?: string; // for E-Puja
   transactionDateTime?: string;
   otpVerified?: boolean;
+  razorpayOrderId?: string; // Razorpay order ID
+  razorpayPaymentId?: string; // Razorpay payment ID after successful payment
+  paidAt?: string; // ISO timestamp when payment was confirmed
+  receiptUrl?: string; // Payment receipt URL from Razorpay
+  paymentStatus?: 'pending' | 'paid' | 'failed'; // Payment gateway status
 }
 
 export interface ChatMessage {

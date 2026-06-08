@@ -696,17 +696,31 @@ export default function App() {
         return;
       }
 
-      // CAPTCHA verified; proceed to create booking
-      if (!selectedPuja || !selectedPackage) {
-        alert('Please choose a puja and package before confirming payment.');
-        setBookingStep('package');
-        setPaymentProcessing(false);
-        return;
-      }
+      // CAPTCHA verified; proceed to Razorpay payment
+      await initiateRazorpayPayment();
+    } catch (err) {
+      console.error('CAPTCHA verification error:', err);
+      setCaptchaError('Network error during verification. Please try again.');
+    } finally {
+      setPaymentProcessing(false);
+    }
+  };
 
+  const initiateRazorpayPayment = async () => {
+    if (!selectedPuja || !selectedPackage) {
+      alert('Please choose a puja and package before confirming payment.');
+      setBookingStep('package');
+      return;
+    }
+
+    setPaymentProcessing(true);
+    setCaptchaError('');
+
+    try {
       const pricePaid = calculateTotalPrice();
       const newBookingId = `BKG-${Math.floor(1000 + Math.random() * 9000)}-VEDA`;
       
+      // Create pending booking first
       const newBooking: Booking = {
         id: newBookingId,
         pujaId: selectedPuja.id,
@@ -727,34 +741,106 @@ export default function App() {
         address: pujaMode === 'in-person-home' ? address : undefined,
         includeSamagriKit,
         notes,
-        status: 'confirmed',
-        paymentId: `PAY-TXN-${Math.floor(100000 + Math.random() * 900000)}`,
-        paymentMethod: paymentMethod === 'upi' ? `UPI App` : paymentMethod === 'card' ? 'Secure Visa/MasterCard' : 'NetBanking Secure',
+        status: 'pending-payment',
+        paymentStatus: 'pending',
+        paymentMethod: 'Razorpay',
         meetingLink: pujaMode === 'e-puja' ? `https://meet.google.com/ais-veda-${selectedPuja!.id}` : undefined,
         transactionDateTime: new Date().toISOString(),
         otpVerified: true
       };
 
-      // Save booking
+      // Save booking as pending
       setBookings(prev => [newBooking, ...prev]);
       setLastCreatedBooking(newBooking);
-      
-      // Send booking confirmation email
-      try {
-        await fetch('/api/send-booking-confirmation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newBooking)
-        });
-      } catch (emailErr) {
-        console.warn('Email confirmation send delayed:', emailErr);
+
+      // Create payment order with Razorpay
+      const paymentRes = await fetch('/api/create-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookingId: newBookingId,
+          amount: pricePaid,
+          currency: 'INR',
+          customerEmail: customerEmail,
+          customerName: customerName
+        })
+      });
+
+      const paymentData = await paymentRes.json();
+
+      if (!paymentData.success || !paymentData.orderId) {
+        setCaptchaError('Failed to initiate payment. Please try again.');
+        setPaymentProcessing(false);
+        return;
       }
 
-      setBookingStep('success');
+      // Open Razorpay checkout
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => {
+        const options = {
+          key: paymentData.key,
+          amount: paymentData.amount, // in paise
+          currency: paymentData.currency,
+          name: 'Pooja4Panditji',
+          description: `${selectedPuja.name} - ${selectedPackage.name}`,
+          order_id: paymentData.orderId,
+          handler: async (response: any) => {
+            try {
+              // Verify payment on server
+              const verifyRes = await fetch('/api/verify-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                  bookingId: newBookingId
+                })
+              });
+
+              const verifyData = await verifyRes.json();
+
+              if (verifyData.success) {
+                setBookingStep('success');
+                console.log('Payment successful for booking:', newBookingId);
+              } else {
+                setCaptchaError('Payment verification failed. Please contact support.');
+              }
+            } catch (err) {
+              console.error('Payment verification error:', err);
+              setCaptchaError('Payment verification error. Please try again.');
+            } finally {
+              setPaymentProcessing(false);
+            }
+          },
+          prefill: {
+            name: customerName,
+            email: customerEmail,
+            contact: customerPhone
+          },
+          notes: {
+            bookingId: newBookingId,
+            pujaName: selectedPuja.name
+          },
+          theme: {
+            color: '#D97706'
+          }
+        };
+
+        const razorpay = new (window as any).Razorpay(options);
+        razorpay.on('payment.failed', (response: any) => {
+          setCaptchaError(`Payment failed: ${response.error.description}`);
+          setPaymentProcessing(false);
+          console.error('Payment failed:', response.error);
+        });
+        razorpay.open();
+      };
+      document.body.appendChild(script);
     } catch (err) {
-      console.error('CAPTCHA verification error:', err);
-      setCaptchaError('Network error during verification. Please try again.');
-    } finally {
+      console.error('Payment initiation error:', err);
+      setCaptchaError('Failed to initiate payment. Please try again.');
       setPaymentProcessing(false);
     }
   };
